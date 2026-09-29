@@ -13,6 +13,7 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
+import com.mojang.blaze3d.systems.RenderSystem;
 
 public class CommercialEngineScreen
         extends AbstractContainerScreen<CommercialEngineMenu> {
@@ -47,36 +48,53 @@ public class CommercialEngineScreen
         int x = leftPos;
         int y = topPos;
 
-        graphics.blit(TEXTURE, x, y, 0, 0, imageWidth, imageHeight);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
 
-        int steamHeight = scaled(
-                menu.getSteamAmount(), menu.getSteamCapacity(), 47
-        );
+        try {
+            graphics.blit(
+                    TEXTURE, x, y, 0, 0,
+                    imageWidth, imageHeight
+            );
 
-        graphics.fill(x + 71, y + 23, x + 87, y + 70, 0xFF343434);
-        graphics.fill(
-                x + 71, y + 70 - steamHeight,
-                x + 87, y + 70, 0xFFD8D8D8
-        );
-        graphics.blit(TEXTURE, x + 71, y + 23, 176, 0, 16, 47);
+            int steamHeight = scaled(
+                    menu.getSteamAmount(),
+                    menu.getSteamCapacity(),
+                    47
+            );
 
-        int energyHeight = scaled(
-                menu.getEnergyStored(), menu.getMaxEnergy(), 43
-        );
+            if (steamHeight > 0) {
+                graphics.fill(
+                        x + 71, y + 70 - steamHeight,
+                        x + 87, y + 70,
+                        0xFFD8D8D8
+                );
 
-        int energyColor = switch (menu.getEnergyStage()) {
-            case 0 -> 0xFF3269C8;
-            case 1 -> 0xFF36A34A;
-            case 2 -> 0xFFE2CF37;
-            case 3 -> 0xFFE89427;
-            default -> 0xFFCC3535;
-        };
+                graphics.blit(
+                        TEXTURE,
+                        x + 71, y + 23,
+                        176, 0,
+                        16, 47
+                );
+            }
 
-        graphics.fill(x + 94, y + 25, x + 100, y + 68, 0xFF343434);
-        graphics.fill(
-                x + 94, y + 68 - energyHeight,
-                x + 100, y + 68, energyColor
-        );
+            int energyHeight = scaled(
+                    menu.getEnergyStored(),
+                    menu.getMaxEnergy(),
+                    43
+            );
+
+            if (energyHeight > 0) {
+                graphics.blit(
+                        TEXTURE,
+                        x + 94, y + 25 + 43 - energyHeight,
+                        176, 47 + 43 - energyHeight,
+                        6, energyHeight
+                );
+            }
+        } finally {
+            RenderSystem.disableBlend();
+        }
     }
 
     @Override

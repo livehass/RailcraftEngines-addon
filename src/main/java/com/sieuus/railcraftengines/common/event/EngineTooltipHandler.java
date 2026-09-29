@@ -30,9 +30,10 @@ public final class EngineTooltipHandler {
             description.add(line("output", 20));
             description.add(line("hobbyist_fuel"));
             description.add(line("internal_steam"));
-        } else if (stack.is(
-                RailcraftEngineItems.INDUSTRIAL_STEAM_ENGINE.get()
-        )) {
+        } else if (stack.is(RailcraftEngineItems.COMMERCIAL_STEAM_ENGINE.get())) {
+            description.add(line("output", 40));
+            description.add(line("steam_consumption", 20));
+        } else if (stack.is(RailcraftEngineItems.INDUSTRIAL_STEAM_ENGINE.get())) {
             description.add(line("output", 80));
             description.add(line("steam_consumption", 40));
         } else {

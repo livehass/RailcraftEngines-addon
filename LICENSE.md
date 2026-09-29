@@ -1,6 +1,6 @@
 # Railcraft Engines Custom License
 
-Copyright (c) 2026 Livehass
+Copyright (c) 2026 Livehass / Sieuus
 
 This license applies only to original code and assets created for Railcraft
 Engines by its author(s). It does not replace or override the licenses or

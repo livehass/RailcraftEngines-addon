@@ -37,6 +37,8 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.IFluidHandlerItem;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.wrapper.RangedWrapper;
 
 import javax.annotation.Nullable;
 
@@ -82,6 +84,18 @@ public final class TileEngineSteamHobby
             TileEngineSteamHobby.this.setChanged();
         }
     };
+
+    private final IItemHandler automationInventory =
+            new RangedWrapper(inventory, 0, inventory.getSlots()) {
+                @Override
+                public ItemStack extractItem(int slot, int amount, boolean simulate) {
+                    if (slot != SLOT_LIQUID_OUTPUT) {
+                        return ItemStack.EMPTY;
+                    }
+
+                    return super.extractItem(slot, amount, simulate);
+                }
+            };
 
     private final BoilerLogic boiler;
 
@@ -348,7 +362,12 @@ public final class TileEngineSteamHobby
     }
 
     public ItemStackHandler getInventory() {
+
         return inventory;
+    }
+
+    public IItemHandler getAutomationInventory() {
+        return automationInventory;
     }
 
     public IFluidHandler getFluidInputHandler() {

@@ -19,6 +19,11 @@ public final class RailcraftEngineItems {
     private RailcraftEngineItems() {
     }
 
+    public static final DeferredItem<BlockItem> COMMERCIAL_STEAM_ENGINE =
+            ITEMS.registerSimpleBlockItem(
+                    RailcraftEngineBlocks.COMMERCIAL_STEAM_ENGINE
+            );
+
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);
     }

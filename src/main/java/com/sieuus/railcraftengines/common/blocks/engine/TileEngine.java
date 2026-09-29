@@ -281,10 +281,12 @@ public abstract class TileEngine extends BlockEntity {
         return EnergyStage.OVERHEAT;
     }
 
-    protected void resetEnergyStage() {
-        setEnergyStage(
-                computeEnergyStage()
-        );
+    public void resetEnergyStage() {
+        if (level == null || level.isClientSide()) {
+            return;
+        }
+
+        setEnergyStage(computeEnergyStage());
     }
 
     private IEnergyStorage getEnergyReceiver() {
@@ -439,6 +441,44 @@ public abstract class TileEngine extends BlockEntity {
                     tag.getInt("EnergyStage")
             );
         }
+    }
+    private final IEnergyStorage energyConnection = new IEnergyStorage() {
+        @Override
+        public int receiveEnergy(int maxReceive, boolean simulate) {
+            return 0;
+        }
+
+        @Override
+        public int extractEnergy(int maxExtract, boolean simulate) {
+            // Energy is pushed by the engine during the piston stroke.
+            return 0;
+        }
+
+        @Override
+        public int getEnergyStored() {
+            return (int) Math.min(
+                    Integer.MAX_VALUE, TileEngine.this.getEnergyStored());
+        }
+
+        @Override
+        public int getMaxEnergyStored() {
+            return (int) Math.min(
+                    Integer.MAX_VALUE, TileEngine.this.getMaxEnergy());
+        }
+
+        @Override
+        public boolean canExtract() {
+            return true;
+        }
+
+        @Override
+        public boolean canReceive() {
+            return false;
+        }
+    };
+
+    public IEnergyStorage getEnergyConnection() {
+        return energyConnection;
     }
 
     @Override

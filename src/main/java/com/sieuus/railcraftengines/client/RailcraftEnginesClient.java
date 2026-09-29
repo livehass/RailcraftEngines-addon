@@ -14,7 +14,7 @@ import com.sieuus.railcraftengines.client.render.models.engine.ModelEngineTrunk;
 import com.sieuus.railcraftengines.client.screen.HobbyistEngineScreen;
 import com.sieuus.railcraftengines.registry.RailcraftEngineMenus;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
-
+import com.sieuus.railcraftengines.client.screen.CommercialEngineScreen;
 
 @EventBusSubscriber(
         modid = RailcraftEngines.MODID,
@@ -22,8 +22,6 @@ import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 )
 public final class RailcraftEnginesClient {
 
-    private RailcraftEnginesClient() {
-    }
 
     @SubscribeEvent
     public static void registerRenderers(
@@ -31,7 +29,29 @@ public final class RailcraftEnginesClient {
     ) {
         event.registerBlockEntityRenderer(
                 RailcraftEngineBlockEntities.HOBBYIST_STEAM_ENGINE.get(),
-                SteamEngineRenderer::new
+                context -> new SteamEngineRenderer<>(context)
+        );
+
+        event.registerBlockEntityRenderer(
+                RailcraftEngineBlockEntities.COMMERCIAL_STEAM_ENGINE.get(),
+                context -> new SteamEngineRenderer<>(context)
+        );
+
+
+
+
+    }
+
+    @SubscribeEvent
+    public static void registerScreens(RegisterMenuScreensEvent event) {
+        event.register(
+                RailcraftEngineMenus.HOBBYIST_ENGINE.get(),
+                HobbyistEngineScreen::new
+        );
+
+        event.register(
+                RailcraftEngineMenus.COMMERCIAL_ENGINE.get(),
+                CommercialEngineScreen::new
         );
     }
 
@@ -60,13 +80,5 @@ public final class RailcraftEnginesClient {
         );
     }
 
-    @SubscribeEvent
-    public static void registerScreens(
-            RegisterMenuScreensEvent event
-    ) {
-        event.register(
-                RailcraftEngineMenus.HOBBYIST_ENGINE.get(),
-                HobbyistEngineScreen::new
-        );
-    }
+
 }

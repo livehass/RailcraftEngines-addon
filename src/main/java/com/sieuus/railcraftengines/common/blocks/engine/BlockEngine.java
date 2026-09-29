@@ -23,6 +23,12 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.BlockHitResult;
 import java.util.function.BiFunction;
+import mods.railcraft.particle.RailcraftParticleTypes;
+import net.minecraft.util.RandomSource;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.particle.Particle;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 
 public class BlockEngine extends Block implements EntityBlock {
 
@@ -135,5 +141,45 @@ public class BlockEngine extends Block implements EntityBlock {
         }
 
         return InteractionResult.SUCCESS;
+    }
+
+    @Override
+    @OnlyIn(Dist.CLIENT)
+    public void animateTick(BlockState state, Level level,
+                            BlockPos pos, RandomSource random) {
+        if (!(level.getBlockEntity(pos) instanceof TileEngineSteam engine)) {
+            return;
+        }
+
+        TileEngine.EnergyStage stage = engine.getEnergyStage();
+
+        if (!engine.isActive() && stage != TileEngine.EnergyStage.OVERHEAT) {
+            return;
+        }
+
+        int count = switch (stage) {
+            case BLUE -> 1;
+            case GREEN -> 2;
+            case YELLOW -> 3;
+            case ORANGE -> 4;
+            case RED -> 5;
+            case OVERHEAT -> 8;
+        };
+
+        for (int i = 0; i < count; i++) {
+            Particle particle = Minecraft.getInstance().particleEngine.createParticle(
+                    RailcraftParticleTypes.STEAM.get(),
+                    pos.getX() + 0.5,
+                    pos.getY() + 0.5,
+                    pos.getZ() + 0.5,
+                    random.nextGaussian() * 0.1,
+                    random.nextDouble() * 0.01,
+                    random.nextGaussian() * 0.1
+            );
+
+            if (particle != null) {
+                particle.scale(0.15F);
+            }
+        }
     }
 }

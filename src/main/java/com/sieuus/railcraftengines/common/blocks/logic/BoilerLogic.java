@@ -21,6 +21,7 @@ public final class BoilerLogic {
     private final Runnable onChanged;
 
     private int burnCycle;
+    private boolean burning;
 
     private double partialConversions;
     private double temperature = SteamConstants.COLD_TEMP;
@@ -56,24 +57,24 @@ public final class BoilerLogic {
         if (burnCycle >= boilerData.ticksPerCycle()) {
             burnCycle = 0;
 
-            if (isBurning()) {
-                burnTime -= getFuelPerCycle();
+            double fuelNeeded = getFuelPerCycle();
 
-                if (burnTime < 0) {
-                    burnTime = 0;
-                }
-            }
-
-            while (!isBurning()) {
+            while (burnTime < fuelNeeded) {
                 if (!addFuel()) {
                     break;
                 }
             }
 
+            burning = burnTime >= fuelNeeded;
+
+            if (burning) {
+                burnTime -= fuelNeeded;
+            }
+
             convertSteam();
         }
 
-        if (isBurning()) {
+        if (burning) {
             increaseTemperature();
         } else {
             reduceTemperature();
@@ -90,9 +91,12 @@ public final class BoilerLogic {
         }
 
         burnTime += fuel;
-        currentItemBurnTime = fuel;
-
+        currentItemBurnTime = burnTime;
         return true;
+    }
+
+    public boolean isBurning() {
+        return burning;
     }
 
     public double getFuelPerCycle() {
@@ -238,10 +242,6 @@ public final class BoilerLogic {
                 );
     }
 
-    public boolean isBurning() {
-        return burnTime >= getFuelPerCycle();
-    }
-
     public boolean isHot() {
         return temperature >= SteamConstants.BOILING_POINT;
     }
@@ -308,6 +308,10 @@ public final class BoilerLogic {
         burnCycle =
                 tag.getInt("BoilerBurnCycle");
 
+        burning = tag.contains("BoilerBurning")
+                ? tag.getBoolean("BoilerBurning")
+                : burnTime >= getFuelPerCycle();
+
         if (tag.contains("BoilerWaterTank")) {
             waterTank.readFromNBT(
                     registries,
@@ -320,6 +324,11 @@ public final class BoilerLogic {
             CompoundTag tag,
             HolderLookup.Provider registries
     ) {
+        tag.putBoolean(
+                "BoilerBurning",
+                burning
+        );
+
         tag.putDouble(
                 "BoilerTemperature",
                 temperature

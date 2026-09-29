@@ -22,9 +22,10 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
-import com.sieuus.railcraftengines.common.util.steam.SteamConstants;
-import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import mods.railcraft.sounds.RailcraftSoundEvents;
+import net.minecraft.sounds.SoundSource;
+
+
 
 public abstract class TileEngineSteam extends TileEngine {
 
@@ -192,6 +193,36 @@ public abstract class TileEngineSteam extends TileEngine {
         tag.putInt(
                 "SteamUsed",
                 steamUsed
+        );
+    }
+
+    @Override
+    protected void playSoundOut() {
+        playSteamBurst(0.5F);
+    }
+
+    @Override
+    protected void playSoundIn() {
+        playSteamBurst(1.0F);
+    }
+
+    private void playSteamBurst(float basePitch) {
+        if (level == null || !level.isClientSide()) {
+            return;
+        }
+
+        float pitch = (float) (
+                basePitch + level.random.nextGaussian() * 0.1);
+
+        level.playLocalSound(
+                worldPosition.getX() + 0.5,
+                worldPosition.getY() + 0.5,
+                worldPosition.getZ() + 0.5,
+                RailcraftSoundEvents.STEAM_BURST.get(),
+                SoundSource.BLOCKS,
+                0.15F,
+                pitch,
+                false
         );
     }
 }

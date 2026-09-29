@@ -26,14 +26,21 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
+import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteam;
+import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamCommercial;
 
-public final class SteamEngineRenderer
-        implements BlockEntityRenderer<TileEngineSteamHobby> {
+public final class SteamEngineRenderer<T extends TileEngineSteam>
+        implements BlockEntityRenderer<T> {
 
     private static final ResourceLocation HOBBYIST_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(
                     RailcraftEngines.MODID,
                     "textures/block/engine/steam_hobby.png"
+            );
+    private static final ResourceLocation COMMERCIAL_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath(
+                    RailcraftEngines.MODID,
+                    "textures/block/engine/steam_low.png"
             );
 
     private static final float MAX_PISTON_TRAVEL = 7.99F;
@@ -67,20 +74,20 @@ public final class SteamEngineRenderer
 
     @Override
     public void render(
-            TileEngineSteamHobby engine,
+            T engine,
             float partialTick,
             PoseStack poseStack,
             MultiBufferSource bufferSource,
             int packedLight,
             int packedOverlay
     ) {
-        VertexConsumer consumer =
-                bufferSource.getBuffer(
-                        RenderType.entityCutout(
-                                HOBBYIST_TEXTURE
-                        )
-                );
+        ResourceLocation texture = engine instanceof TileEngineSteamCommercial
+                ? COMMERCIAL_TEXTURE
+                : HOBBYIST_TEXTURE;
 
+        VertexConsumer consumer = bufferSource.getBuffer(
+                RenderType.entityCutout(texture)
+        );
         poseStack.pushPose();
 
         poseStack.translate(

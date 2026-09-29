@@ -2,112 +2,168 @@ package com.sieuus.railcraftengines.common.menu;
 
 import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamHobby;
 import com.sieuus.railcraftengines.registry.RailcraftEngineMenus;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerData;
+import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.fluids.capability.IFluidHandlerItem;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
 public final class HobbyistEngineMenu extends AbstractContainerMenu {
 
     private static final int ENGINE_SLOT_COUNT = 3;
+    private static final int DATA_COUNT = 11;
+
+    private static final int WATER = 0;
+    private static final int WATER_CAPACITY = 1;
+    private static final int STEAM = 2;
+    private static final int STEAM_CAPACITY = 3;
+    private static final int TEMPERATURE = 4;
+    private static final int MAX_TEMPERATURE = 5;
+    private static final int FUEL_PROGRESS = 6;
+    private static final int HAS_FUEL = 7;
+    private static final int ENERGY = 8;
+    private static final int MAX_ENERGY = 9;
+    private static final int OUTPUT = 10;
 
     private final TileEngineSteamHobby engine;
+    private final ContainerData data;
 
-    public HobbyistEngineMenu(
-            int containerId,
-            Inventory playerInventory
-    ) {
-        this(
-                containerId,
-                playerInventory,
-                null,
-                new ItemStackHandler(ENGINE_SLOT_COUNT)
-        );
+    // Construtor usado pelo cliente.
+    public HobbyistEngineMenu(int containerId, Inventory playerInventory) {
+        this(containerId, playerInventory, null,
+                new ItemStackHandler(ENGINE_SLOT_COUNT),
+                new SimpleContainerData(DATA_COUNT));
     }
 
-    public HobbyistEngineMenu(
-            int containerId,
-            Inventory playerInventory,
-            TileEngineSteamHobby engine
-    ) {
-        this(
-                containerId,
-                playerInventory,
-                engine,
-                engine.getInventory()
-        );
+    // Construtor usado pelo servidor.
+    public HobbyistEngineMenu(int containerId, Inventory playerInventory,
+                              TileEngineSteamHobby engine) {
+        this(containerId, playerInventory, engine, engine.getInventory(),
+                createData(engine));
     }
 
-    private HobbyistEngineMenu(
-            int containerId,
-            Inventory playerInventory,
-            TileEngineSteamHobby engine,
-            ItemStackHandler engineInventory
-    ) {
-        super(
-                RailcraftEngineMenus.HOBBYIST_ENGINE.get(),
-                containerId
-        );
-
+    private HobbyistEngineMenu(int containerId, Inventory playerInventory,
+                               TileEngineSteamHobby engine,
+                               ItemStackHandler inventory, ContainerData data) {
+        super(RailcraftEngineMenus.HOBBYIST_ENGINE.get(), containerId);
         this.engine = engine;
+        this.data = data;
 
-        addSlot(
-                new SlotItemHandler(
-                        engineInventory,
-                        TileEngineSteamHobby.SLOT_FUEL,
-                        62,
-                        39
-                )
-        );
+        checkContainerDataCount(data, DATA_COUNT);
 
-        addSlot(
-                new SlotItemHandler(
-                        engineInventory,
-                        TileEngineSteamHobby.SLOT_LIQUID_INPUT,
-                        143,
-                        21
-                )
-        );
+        addSlot(new SlotItemHandler(inventory,
+                TileEngineSteamHobby.SLOT_FUEL, 62, 39) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return TileEngineSteamHobby.isValidFuel(stack);
+            }
+        });
 
-        addSlot(
-                new SlotItemHandler(
-                        engineInventory,
-                        TileEngineSteamHobby.SLOT_LIQUID_OUTPUT,
-                        143,
-                        56
-                )
-        );
+        addSlot(new SlotItemHandler(inventory,
+                TileEngineSteamHobby.SLOT_LIQUID_INPUT, 143, 21) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return containsWater(stack);
+            }
+        });
 
-        addPlayerInventory(playerInventory);
-    }
+        addSlot(new SlotItemHandler(inventory,
+                TileEngineSteamHobby.SLOT_LIQUID_OUTPUT, 143, 56) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return false;
+            }
+        });
 
-    private void addPlayerInventory(Inventory inventory) {
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
-                addSlot(
-                        new Slot(
-                                inventory,
-                                column + row * 9 + 9,
-                                8 + column * 18,
-                                84 + row * 18
-                        )
-                );
+                addSlot(new Slot(playerInventory, column + row * 9 + 9,
+                        8 + column * 18, 84 + row * 18));
             }
         }
 
         for (int column = 0; column < 9; column++) {
-            addSlot(
-                    new Slot(
-                            inventory,
-                            column,
-                            8 + column * 18,
-                            142
-                    )
-            );
+            addSlot(new Slot(playerInventory, column,
+                    8 + column * 18, 142));
         }
+
+        addDataSlots(data);
+    }
+
+    private static ContainerData createData(TileEngineSteamHobby engine) {
+        return new ContainerData() {
+            @Override
+            public int get(int index) {
+                var boiler = engine.getBoiler();
+
+                return switch (index) {
+                    case WATER -> engine.getWaterTank().getFluidAmount();
+                    case WATER_CAPACITY -> engine.getWaterTank().getCapacity();
+                    case STEAM -> engine.getSteamTank().getFluidAmount();
+                    case STEAM_CAPACITY -> engine.getSteamTank().getCapacity();
+                    case TEMPERATURE ->
+                            (int) Math.round(boiler.getTemperature() * 10);
+                    case MAX_TEMPERATURE ->
+                            (int) Math.round(boiler.getMaxTemperature() * 10);
+                    case FUEL_PROGRESS -> {
+                        double total = boiler.getCurrentItemBurnTime();
+                        double ratio = total > 0
+                                ? boiler.getBurnTime() / total : 0;
+                        yield (int) Math.round(
+                                Math.clamp(ratio, 0.0, 1.0) * 1000);
+                    }
+                    case HAS_FUEL -> boiler.getBurnTime() > 0 ? 1 : 0;
+                    case ENERGY -> boundedInt(engine.getEnergyStored());
+                    case MAX_ENERGY -> boundedInt(engine.getMaxEnergy());
+                    case OUTPUT ->
+                            boundedInt(Math.round(engine.currentOutput * 100));
+                    default -> 0;
+                };
+            }
+
+            @Override
+            public void set(int index, int value) {
+                // No servidor, os valores são lidos diretamente do motor.
+            }
+
+            @Override
+            public int getCount() {
+                return DATA_COUNT;
+            }
+        };
+    }
+
+    private static int boundedInt(long value) {
+        return (int) Math.clamp(value, 0L, (long) Integer.MAX_VALUE);
+    }
+
+    private static boolean containsWater(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+
+        IFluidHandlerItem handler =
+                stack.getCapability(Capabilities.FluidHandler.ITEM);
+
+        if (handler == null) {
+            return false;
+        }
+
+        for (int tank = 0; tank < handler.getTanks(); tank++) {
+            var fluid = handler.getFluidInTank(tank);
+            if (!fluid.isEmpty() && fluid.is(FluidTags.WATER)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     @Override
@@ -116,30 +172,25 @@ public final class HobbyistEngineMenu extends AbstractContainerMenu {
             return true;
         }
 
-        if (engine.getLevel() == null) {
-            return false;
-        }
-
-        if (engine.getLevel().getBlockEntity(
-                engine.getBlockPos()
-        ) != engine) {
+        if (engine.getLevel() == null
+                || engine.getLevel().getBlockEntity(engine.getBlockPos())
+                != engine) {
             return false;
         }
 
         return player.distanceToSqr(
-                engine.getBlockPos().getX() + 0.5D,
-                engine.getBlockPos().getY() + 0.5D,
-                engine.getBlockPos().getZ() + 0.5D
-        ) <= 64.0D;
+                engine.getBlockPos().getX() + 0.5,
+                engine.getBlockPos().getY() + 0.5,
+                engine.getBlockPos().getZ() + 0.5) <= 64.0;
     }
 
     @Override
-    public ItemStack quickMoveStack(
-            Player player,
-            int index
-    ) {
-        Slot slot = slots.get(index);
+    public ItemStack quickMoveStack(Player player, int index) {
+        if (index < 0 || index >= slots.size()) {
+            return ItemStack.EMPTY;
+        }
 
+        Slot slot = slots.get(index);
         if (!slot.hasItem()) {
             return ItemStack.EMPTY;
         }
@@ -148,23 +199,11 @@ public final class HobbyistEngineMenu extends AbstractContainerMenu {
         ItemStack original = stack.copy();
 
         if (index < ENGINE_SLOT_COUNT) {
-            if (!moveItemStackTo(
-                    stack,
-                    ENGINE_SLOT_COUNT,
-                    slots.size(),
-                    true
-            )) {
+            if (!moveItemStackTo(stack, ENGINE_SLOT_COUNT, slots.size(), true)) {
                 return ItemStack.EMPTY;
             }
-        } else {
-            if (!moveItemStackTo(
-                    stack,
-                    0,
-                    ENGINE_SLOT_COUNT,
-                    false
-            )) {
-                return ItemStack.EMPTY;
-            }
+        } else if (!moveItemStackTo(stack, 0, ENGINE_SLOT_COUNT, false)) {
+            return ItemStack.EMPTY;
         }
 
         if (stack.isEmpty()) {
@@ -178,11 +217,54 @@ public final class HobbyistEngineMenu extends AbstractContainerMenu {
         }
 
         slot.onTake(player, stack);
-
         return original;
     }
 
     public TileEngineSteamHobby getEngine() {
         return engine;
+    }
+
+    public int getWaterAmount() {
+        return data.get(WATER);
+    }
+
+    public int getWaterCapacity() {
+        return data.get(WATER_CAPACITY);
+    }
+
+    public int getSteamAmount() {
+        return data.get(STEAM);
+    }
+
+    public int getSteamCapacity() {
+        return data.get(STEAM_CAPACITY);
+    }
+
+    public double getTemperature() {
+        return data.get(TEMPERATURE) / 10.0;
+    }
+
+    public double getMaxTemperature() {
+        return data.get(MAX_TEMPERATURE) / 10.0;
+    }
+
+    public int getFuelProgressScaled(int pixels) {
+        return data.get(FUEL_PROGRESS) * pixels / 1000;
+    }
+
+    public boolean hasFuel() {
+        return data.get(HAS_FUEL) != 0;
+    }
+
+    public int getEnergyStored() {
+        return data.get(ENERGY);
+    }
+
+    public int getMaxEnergy() {
+        return data.get(MAX_ENERGY);
+    }
+
+    public double getCurrentOutput() {
+        return data.get(OUTPUT) / 100.0;
     }
 }

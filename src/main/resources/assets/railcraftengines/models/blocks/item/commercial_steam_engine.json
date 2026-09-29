@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "railcraftengines:textures/block/engine/engine.steam.low"
+  }
+}

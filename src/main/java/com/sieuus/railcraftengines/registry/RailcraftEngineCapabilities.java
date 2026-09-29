@@ -29,5 +29,30 @@ public final class RailcraftEngineCapabilities {
                     return engine.getFluidInputHandler();
                 }
         );
+
+        event.registerBlockEntity(
+                Capabilities.EnergyStorage.BLOCK,
+                RailcraftEngineBlockEntities.HOBBYIST_STEAM_ENGINE.get(),
+                (engine, side) -> side == engine.getFacing()
+                        ? engine.getEnergyConnection()
+                        : null
+        );
+
+
+        event.registerBlockEntity(
+                Capabilities.FluidHandler.BLOCK,
+                RailcraftEngineBlockEntities.COMMERCIAL_STEAM_ENGINE.get(),
+                (engine, side) -> side == engine.getFacing()
+                        ? null
+                        : engine.getFluidInputHandler()
+        );
+
+        event.registerBlockEntity(
+                Capabilities.EnergyStorage.BLOCK,
+                RailcraftEngineBlockEntities.COMMERCIAL_STEAM_ENGINE.get(),
+                (engine, side) -> side == engine.getFacing()
+                        ? engine.getEnergyConnection()
+                        : null
+        );
     }
 }

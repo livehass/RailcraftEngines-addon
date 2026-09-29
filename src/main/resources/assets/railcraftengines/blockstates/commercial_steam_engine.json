@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "railcraftengines:block/commercial_steam_engine"
+    }
+  }
+}

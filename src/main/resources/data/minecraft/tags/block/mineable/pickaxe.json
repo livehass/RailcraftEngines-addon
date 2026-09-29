@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "railcraftengines:hobbyist_steam_engine",
+    "railcraftengines:commercial_steam_engine"
+  ]
+}

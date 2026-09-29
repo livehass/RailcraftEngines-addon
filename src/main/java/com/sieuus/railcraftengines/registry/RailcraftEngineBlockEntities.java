@@ -1,6 +1,7 @@
 package com.sieuus.railcraftengines.registry;
 
 import com.sieuus.railcraftengines.RailcraftEngines;
+import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamCommercial;
 import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamHobby;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -30,6 +31,16 @@ public final class RailcraftEngineBlockEntities {
 
     private RailcraftEngineBlockEntities() {
     }
+
+    public static final DeferredHolder<
+            BlockEntityType<?>, BlockEntityType<TileEngineSteamCommercial>
+            > COMMERCIAL_STEAM_ENGINE = BLOCK_ENTITIES.register(
+            "commercial_steam_engine",
+            () -> BlockEntityType.Builder.of(
+                    TileEngineSteamCommercial::new,
+                    RailcraftEngineBlocks.COMMERCIAL_STEAM_ENGINE.get()
+            ).build(null)
+    );
 
     public static void register(IEventBus eventBus) {
         BLOCK_ENTITIES.register(eventBus);

@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "railcraftengines:block/engine/engine.steam.hobby"
+  }
+}

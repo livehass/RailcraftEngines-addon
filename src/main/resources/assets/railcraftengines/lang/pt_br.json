@@ -7,5 +7,6 @@
   "tooltip.railcraftengines.internal_steam": "Gera vapor internamente",
   "tooltip.railcraftengines.steam_consumption": "Usa %s mB de Vapor por tick em produção máxima",
   "tooltip.railcraftengines.redstone": "Requer um sinal de redstone",
-  "tooltip.railcraftengines.mod_name": "Railcraft Engines"
+  "tooltip.railcraftengines.mod_name": "Motores do railcraft",
+  "itemGroup.railcraftengines": "Motores do railcraft"
 }

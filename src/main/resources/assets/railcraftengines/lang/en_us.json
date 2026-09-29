@@ -7,5 +7,6 @@
   "tooltip.railcraftengines.internal_steam": "Generates steam internally",
   "tooltip.railcraftengines.steam_consumption": "Uses %s mB of Steam per tick at full output",
   "tooltip.railcraftengines.redstone": "Requires a redstone signal",
-  "tooltip.railcraftengines.mod_name": "Railcraft Engines"
+  "tooltip.railcraftengines.mod_name": "Railcraft Engines",
+  "itemGroup.railcraftengines": "Railcraft Engines"
 }

@@ -18,7 +18,7 @@ The addon aims to restore the Hobbyist, Commercial and Industrial Steam Engines 
 [[dependencies.${mod_id}]]
 modId="neoforge"
 type="required"
-versionRange="[${neo_version},)"
+versionRange="${neo_version_range}"
 ordering="NONE"
 side="BOTH"
 

@@ -14,7 +14,9 @@ public final class RailcraftEngineCapabilities {
         event.registerBlockEntity(
                 Capabilities.ItemHandler.BLOCK,
                 RailcraftEngineBlockEntities.HOBBYIST_STEAM_ENGINE.get(),
-                (engine, side) -> engine.getInventory()
+                (engine, side) -> side == engine.getFacing()
+                        ? null
+                        : engine.getAutomationInventory()
         );
 
         event.registerBlockEntity(
@@ -70,5 +72,7 @@ public final class RailcraftEngineCapabilities {
                         ? engine.getEnergyConnection()
                         : null
         );
+
+
     }
 }

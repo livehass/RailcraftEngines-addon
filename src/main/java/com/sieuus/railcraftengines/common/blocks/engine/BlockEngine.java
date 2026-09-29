@@ -29,6 +29,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.Particle;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.minecraft.world.Containers;
+import net.minecraft.world.item.ItemStack;
 
 public class BlockEngine extends Block implements EntityBlock {
 
@@ -141,6 +143,39 @@ public class BlockEngine extends Block implements EntityBlock {
         }
 
         return InteractionResult.SUCCESS;
+    }
+    @Override
+    protected void onRemove(
+            BlockState state,
+            Level level,
+            BlockPos pos,
+            BlockState newState,
+            boolean movedByPiston
+    ) {
+        if (!state.is(newState.getBlock()) && !level.isClientSide()) {
+            if (level.getBlockEntity(pos) instanceof TileEngineSteamHobby engine) {
+                var inventory = engine.getInventory();
+
+                for (int slot = 0; slot < inventory.getSlots(); slot++) {
+                    ItemStack stack = inventory.getStackInSlot(slot).copy();
+
+                    if (!stack.isEmpty()) {
+                        inventory.setStackInSlot(slot, ItemStack.EMPTY);
+                        Containers.dropItemStack(
+                                level,
+                                pos.getX(),
+                                pos.getY(),
+                                pos.getZ(),
+                                stack
+                        );
+                    }
+                }
+
+                level.updateNeighbourForOutputSignal(pos, this);
+            }
+        }
+
+        super.onRemove(state, level, pos, newState, movedByPiston);
     }
 
     @Override

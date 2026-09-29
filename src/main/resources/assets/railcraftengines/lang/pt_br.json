@@ -1,11 +1,11 @@
 {
-  "block.railcraftengines.hobbyist_steam_engine": "Hobbyist Steam Engine",
-  "block.railcraftengines.commercial_steam_engine": "Commercial Steam Engine",
-  "block.railcraftengines.industrial_steam_engine": "Industrial Steam Engine",
-  "tooltip.railcraftengines.output": "Produces up to %s FE/t",
-  "tooltip.railcraftengines.hobbyist_fuel": "Uses water and solid furnace fuel",
-  "tooltip.railcraftengines.internal_steam": "Generates steam internally",
-  "tooltip.railcraftengines.steam_consumption": "Uses %s mB of Steam per tick at full output",
-  "tooltip.railcraftengines.redstone": "Requires a redstone signal",
+  "block.railcraftengines.hobbyist_steam_engine": "Motor a Vapor Amador",
+  "block.railcraftengines.commercial_steam_engine": "Motor a Vapor Comercial",
+  "block.railcraftengines.industrial_steam_engine": "Motor a Vapor industrial",
+  "tooltip.railcraftengines.output": "Produz até %s FE/t",
+  "tooltip.railcraftengines.hobbyist_fuel": "Usa água e combustível sólido de fornalha",
+  "tooltip.railcraftengines.internal_steam": "Gera vapor internamente",
+  "tooltip.railcraftengines.steam_consumption": "Usa %s mB de Vapor por tick em produção máxima",
+  "tooltip.railcraftengines.redstone": "Requer um sinal de redstone",
   "tooltip.railcraftengines.mod_name": "Railcraft Engines"
 }

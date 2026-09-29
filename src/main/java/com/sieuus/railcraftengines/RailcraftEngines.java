@@ -19,6 +19,7 @@ public final class RailcraftEngines {
         RailcraftEngineItems.register(modEventBus);
         RailcraftEngineBlockEntities.register(modEventBus);
         RailcraftEngineMenus.MENUS.register(modEventBus);
+        RailcraftEngineCreativeTabs.register(modEventBus);
 
         modEventBus.addListener(RailcraftEngineCapabilities::register);
     }

@@ -3,6 +3,7 @@ package com.sieuus.railcraftengines.registry;
 import com.sieuus.railcraftengines.RailcraftEngines;
 import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamCommercial;
 import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamHobby;
+import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamIndustrial;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -29,9 +30,6 @@ public final class RailcraftEngineBlockEntities {
                     ).build(null)
             );
 
-    private RailcraftEngineBlockEntities() {
-    }
-
     public static final DeferredHolder<
             BlockEntityType<?>, BlockEntityType<TileEngineSteamCommercial>
             > COMMERCIAL_STEAM_ENGINE = BLOCK_ENTITIES.register(
@@ -41,6 +39,19 @@ public final class RailcraftEngineBlockEntities {
                     RailcraftEngineBlocks.COMMERCIAL_STEAM_ENGINE.get()
             ).build(null)
     );
+
+    public static final DeferredHolder<
+            BlockEntityType<?>, BlockEntityType<TileEngineSteamIndustrial>
+            > INDUSTRIAL_STEAM_ENGINE = BLOCK_ENTITIES.register(
+            "industrial_steam_engine",
+            () -> BlockEntityType.Builder.of(
+                    TileEngineSteamIndustrial::new,
+                    RailcraftEngineBlocks.INDUSTRIAL_STEAM_ENGINE.get()
+            ).build(null)
+    );
+
+
+
 
     public static void register(IEventBus eventBus) {
         BLOCK_ENTITIES.register(eventBus);

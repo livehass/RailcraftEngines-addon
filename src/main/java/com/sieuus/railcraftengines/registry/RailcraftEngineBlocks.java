@@ -10,6 +10,8 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamCommercial;
+import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamIndustrial;
+
 
 public final class RailcraftEngineBlocks {
 
@@ -30,15 +32,27 @@ public final class RailcraftEngineBlocks {
                             .noOcclusion()
             );
 
-    private RailcraftEngineBlocks() {
-    }
-
     public static final DeferredBlock<BlockEngine> COMMERCIAL_STEAM_ENGINE =
             BLOCKS.registerBlock(
                     "commercial_steam_engine",
                     properties -> new BlockEngine(
                             properties,
                             TileEngineSteamCommercial::new
+                    ),
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.METAL)
+                            .strength(3.0F, 6.0F)
+                            .sound(SoundType.METAL)
+                            .noOcclusion()
+            );
+
+
+    public static final DeferredBlock<BlockEngine> INDUSTRIAL_STEAM_ENGINE =
+            BLOCKS.registerBlock(
+                    "industrial_steam_engine",
+                    properties -> new BlockEngine(
+                            properties,
+                            TileEngineSteamIndustrial::new
                     ),
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.METAL)

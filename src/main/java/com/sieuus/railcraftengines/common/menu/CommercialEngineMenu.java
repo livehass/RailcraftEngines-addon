@@ -15,12 +15,14 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamCommercial;
+import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteam;
 
 public class CommercialEngineMenu extends AbstractContainerMenu {
 
     private static final int DATA_COUNT = 6;
 
-    private final TileEngineSteamCommercial engine;
+    private final TileEngineSteam engine;
     private final ContainerData data;
 
     public CommercialEngineMenu(int containerId, Inventory inventory) {
@@ -30,7 +32,7 @@ public class CommercialEngineMenu extends AbstractContainerMenu {
     public CommercialEngineMenu(
             int containerId,
             Inventory inventory,
-            TileEngineSteamCommercial engine
+            TileEngineSteam engine
     ) {
         super(RailcraftEngineMenus.COMMERCIAL_ENGINE.get(), containerId);
         this.engine = engine;

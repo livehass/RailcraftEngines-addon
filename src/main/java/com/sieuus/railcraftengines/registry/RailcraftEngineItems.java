@@ -16,12 +16,14 @@ public final class RailcraftEngineItems {
                     RailcraftEngineBlocks.HOBBYIST_STEAM_ENGINE
             );
 
-    private RailcraftEngineItems() {
-    }
-
     public static final DeferredItem<BlockItem> COMMERCIAL_STEAM_ENGINE =
             ITEMS.registerSimpleBlockItem(
                     RailcraftEngineBlocks.COMMERCIAL_STEAM_ENGINE
+            );
+
+    public static final DeferredItem<BlockItem> INDUSTRIAL_STEAM_ENGINE =
+            ITEMS.registerSimpleBlockItem(
+                    RailcraftEngineBlocks.INDUSTRIAL_STEAM_ENGINE
             );
 
     public static void register(IEventBus eventBus) {

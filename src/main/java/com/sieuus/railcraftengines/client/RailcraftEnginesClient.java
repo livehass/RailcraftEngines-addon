@@ -45,8 +45,10 @@ public final class RailcraftEnginesClient {
                 context -> new SteamEngineRenderer<>(context)
         );
 
-
-
+        event.registerBlockEntityRenderer(
+                RailcraftEngineBlockEntities.INDUSTRIAL_STEAM_ENGINE.get(),
+                context -> new SteamEngineRenderer<>(context)
+        );
 
     }
 

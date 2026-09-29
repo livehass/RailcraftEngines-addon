@@ -28,6 +28,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteam;
 import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamCommercial;
+import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamIndustrial;
 
 public final class SteamEngineRenderer<T extends TileEngineSteam>
         implements BlockEntityRenderer<T> {
@@ -41,6 +42,12 @@ public final class SteamEngineRenderer<T extends TileEngineSteam>
             ResourceLocation.fromNamespaceAndPath(
                     RailcraftEngines.MODID,
                     "textures/block/engine/steam_low.png"
+            );
+
+    private static final ResourceLocation INDUSTRIAL_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath(
+                    RailcraftEngines.MODID,
+                    "textures/block/engine/steam_high.png"
             );
 
     private static final float MAX_PISTON_TRAVEL = 7.99F;
@@ -81,9 +88,15 @@ public final class SteamEngineRenderer<T extends TileEngineSteam>
             int packedLight,
             int packedOverlay
     ) {
-        ResourceLocation texture = engine instanceof TileEngineSteamCommercial
-                ? COMMERCIAL_TEXTURE
-                : HOBBYIST_TEXTURE;
+        ResourceLocation texture;
+
+        if (engine instanceof TileEngineSteamIndustrial) {
+            texture = INDUSTRIAL_TEXTURE;
+        } else if (engine instanceof TileEngineSteamCommercial) {
+            texture = COMMERCIAL_TEXTURE;
+        } else {
+            texture = HOBBYIST_TEXTURE;
+        }
 
         VertexConsumer consumer = bufferSource.getBuffer(
                 RenderType.entityCutout(texture)

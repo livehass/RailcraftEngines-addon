@@ -1,6 +1,11 @@
-
 {
   "block.railcraftengines.hobbyist_steam_engine": "Hobbyist Steam Engine",
-  "block.railcraftengines.commercial_steam_engine": "Commercial Steam Engine"
-}
+  "block.railcraftengines.commercial_steam_engine": "Commercial Steam Engine",
 
+  "tooltip.railcraftengines.output": "Produces up to %s FE/t",
+  "tooltip.railcraftengines.hobbyist_fuel": "Uses water and solid furnace fuel",
+  "tooltip.railcraftengines.internal_steam": "Generates steam internally",
+  "tooltip.railcraftengines.steam_consumption": "Uses %s mB of Steam per tick at full output",
+  "tooltip.railcraftengines.redstone": "Requires a redstone signal",
+  "tooltip.railcraftengines.mod_name": "Railcraft Engines"
+}

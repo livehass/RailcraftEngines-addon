@@ -15,6 +15,14 @@ import com.sieuus.railcraftengines.client.screen.HobbyistEngineScreen;
 import com.sieuus.railcraftengines.registry.RailcraftEngineMenus;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import com.sieuus.railcraftengines.client.screen.CommercialEngineScreen;
+import com.sieuus.railcraftengines.client.render.SteamEngineItemRenderer;
+import com.sieuus.railcraftengines.common.blocks.engine.BlockEngine;
+import com.sieuus.railcraftengines.registry.RailcraftEngineItems;
+import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 
 @EventBusSubscriber(
         modid = RailcraftEngines.MODID,
@@ -78,6 +86,33 @@ public final class RailcraftEnginesClient {
                 ModelEngineTrunk.LAYER,
                 ModelEngineTrunk::createLayer
         );
+    }
+
+    @SubscribeEvent
+    public static void registerClientExtensions(
+            RegisterClientExtensionsEvent event
+    ) {
+        IClientItemExtensions extensions = new IClientItemExtensions() {
+            private SteamEngineItemRenderer renderer;
+
+            @Override
+            public BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                if (renderer == null) {
+                    renderer = new SteamEngineItemRenderer();
+                }
+
+                return renderer;
+            }
+        };
+
+        Item[] engineItems = RailcraftEngineItems.ITEMS.getEntries()
+                .stream()
+                .map(holder -> holder.get())
+                .filter(item -> item instanceof BlockItem blockItem
+                        && blockItem.getBlock() instanceof BlockEngine)
+                .toArray(Item[]::new);
+
+        event.registerItem(extensions, engineItems);
     }
 
 

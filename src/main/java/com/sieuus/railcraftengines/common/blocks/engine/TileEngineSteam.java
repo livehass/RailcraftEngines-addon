@@ -212,7 +212,7 @@ public abstract class TileEngineSteam extends TileEngine {
         }
 
         float pitch = (float) (
-                basePitch + level.random.nextGaussian() * 0.1);
+                basePitch + level.getRandom().nextGaussian() * 0.1);
 
         level.playLocalSound(
                 worldPosition.getX() + 0.5,

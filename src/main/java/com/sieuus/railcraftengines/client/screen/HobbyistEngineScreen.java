@@ -4,39 +4,39 @@ import com.sieuus.railcraftengines.RailcraftEngines;
 import com.sieuus.railcraftengines.common.menu.HobbyistEngineMenu;
 import com.sieuus.railcraftengines.integration.railcraft.RailcraftFluids;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
-import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.block.FluidModel;
 
 import java.util.Locale;
 
 public final class HobbyistEngineScreen
         extends AbstractContainerScreen<HobbyistEngineMenu> {
 
-    private static final ResourceLocation TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(
+    private static final Identifier TEXTURE =
+            Identifier.fromNamespaceAndPath(
                     RailcraftEngines.MODID,
                     "textures/gui/gui_engine_hobby.png");
 
     public HobbyistEngineScreen(HobbyistEngineMenu menu,
                                 Inventory inventory, Component title) {
-        super(menu, inventory, title);
-        imageWidth = 176;
-        imageHeight = 166;
+        super(menu, inventory, title, 176, 166);
     }
 
     @Override
-    protected void renderBg(GuiGraphics graphics, float partialTick,
-                            int mouseX, int mouseY) {
-        graphics.blit(TEXTURE, leftPos, topPos, 0, 0,
-                imageWidth, imageHeight);
+    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX,
+                                  int mouseY, float partialTick) {
+        super.extractBackground(graphics, mouseX, mouseY, partialTick);
+        graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, leftPos, topPos, 0, 0,
+                imageWidth, imageHeight, 256, 256);
 
         drawFluidGauge(graphics, RailcraftFluids.getSteam(),
                 menu.getSteamAmount(), menu.getSteamCapacity(), 17, 23);
@@ -52,46 +52,37 @@ public final class HobbyistEngineScreen
 
         if (menu.hasFuel()) {
             int scale = menu.getFuelProgressScaled(12);
-            graphics.blit(TEXTURE, leftPos + 62, topPos + 34 - scale,
-                    176, 59 - scale, 14, scale + 2);
+            graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, leftPos + 62, topPos + 34 - scale,
+                    176, 59 - scale, 14, scale + 2, 256, 256);
         }
     }
 
-    private void drawIndicator(GuiGraphics graphics, int x, int y,
+    private void drawIndicator(GuiGraphicsExtractor graphics, int x, int y,
                                int u, int v, double value, double maximum) {
         int height = scaled(value, maximum, 43);
         if (height <= 0) {
             return;
         }
 
-        graphics.blit(TEXTURE, leftPos + x, topPos + y + 43 - height,
-                u, v + 43 - height, 6, height);
+        graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, leftPos + x, topPos + y + 43 - height,
+                u, v + 43 - height, 6, height, 256, 256);
     }
 
-    private void drawFluidGauge(GuiGraphics graphics, Fluid fluid,
+    private void drawFluidGauge(GuiGraphicsExtractor graphics, Fluid fluid,
                                 int amount, int capacity, int x, int y) {
         int height = scaled(amount, capacity, 47);
         if (fluid == Fluids.EMPTY || height <= 0) {
             return;
         }
 
-        IClientFluidTypeExtensions extensions =
-                IClientFluidTypeExtensions.of(fluid);
-        ResourceLocation stillTexture = extensions.getStillTexture();
-
-        if (stillTexture == null) {
-            return;
-        }
-
-        TextureAtlasSprite sprite = Minecraft.getInstance()
-                .getTextureAtlas(InventoryMenu.BLOCK_ATLAS)
-                .apply(stillTexture);
-
-        int color = extensions.getTintColor();
-        float red = ((color >> 16) & 255) / 255.0F;
-        float green = ((color >> 8) & 255) / 255.0F;
-        float blue = (color & 255) / 255.0F;
-        float alpha = ((color >>> 24) & 255) / 255.0F;
+        FluidModel fluidModel = Minecraft.getInstance()
+                .getModelManager()
+                .getFluidStateModelSet()
+                .get(fluid.defaultFluidState());
+        TextureAtlasSprite sprite = fluidModel.stillMaterial().sprite();
+        int color = fluidModel.fluidTintSource() != null
+                ? fluidModel.fluidTintSource().colorAsStack(new FluidStack(fluid, 1))
+                : 0xFFFFFFFF;
 
         int screenX = leftPos + x;
         int screenY = topPos + y;
@@ -100,18 +91,15 @@ public final class HobbyistEngineScreen
                 screenX + 16, screenY + 47);
 
         try {
-            graphics.setColor(red, green, blue, alpha);
-
             for (int offset = 0; offset < 47; offset += 16) {
-                graphics.blit(screenX, screenY + offset,
-                        0, 16, 16, sprite);
+                graphics.blitSprite(RenderPipelines.GUI_TEXTURED, sprite,
+                        screenX, screenY + offset, 16, 16, color);
             }
         } finally {
-            graphics.setColor(1, 1, 1, 1);
             graphics.disableScissor();
         }
 
-        graphics.blit(TEXTURE, screenX, screenY, 176, 0, 16, 47);
+        graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, screenX, screenY, 176, 0, 16, 47, 256, 256);
     }
 
     private static int scaled(double value, double maximum, int pixels) {
@@ -124,26 +112,25 @@ public final class HobbyistEngineScreen
     }
 
     @Override
-    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
+    protected void extractLabels(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
         Component name = Component.translatable(
                 "block.railcraftengines.hobbyist_steam_engine");
 
-        graphics.drawString(font, name,
-                (imageWidth - font.width(name)) / 2, 6, 0x404040, false);
+        graphics.text(font, name,
+                (imageWidth - font.width(name)) / 2, 6, 0xFF404040, false);
 
-        graphics.drawString(font, playerInventoryTitle,
-                8, imageHeight - 94, 0x404040, false);
+        graphics.text(font, playerInventoryTitle,
+                8, imageHeight - 94, 0xFF404040, false);
 
-        graphics.drawString(font,
+        graphics.text(font,
                 Math.round(menu.getCurrentOutput()) + " FE/t",
-                55, 60, 0x404040, false);
+                55, 60, 0xFF404040, false);
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY,
-                       float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        renderTooltip(graphics, mouseX, mouseY);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY,
+                                   float partialTick) {
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 
         Component tooltip = null;
 
@@ -172,7 +159,7 @@ public final class HobbyistEngineScreen
         }
 
         if (tooltip != null) {
-            graphics.renderTooltip(font, tooltip, mouseX, mouseY);
+            graphics.setTooltipForNextFrame(tooltip, mouseX, mouseY);
         }
     }
 }

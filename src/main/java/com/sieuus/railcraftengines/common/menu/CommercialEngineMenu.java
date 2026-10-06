@@ -1,12 +1,12 @@
 /*
  * Portions derived from Railcraft by CovertJaguar.
  * Original project: https://github.com/Railcraft/Railcraft
- * Adapted for Minecraft 1.21.1 / NeoForge by sieuus.
+ * Adapted for Minecraft 26.1.2 / NeoForge by sieuus.
  */
 
 package com.sieuus.railcraftengines.common.menu;
 
-import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamCommercial;
+import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteam;
 import com.sieuus.railcraftengines.registry.RailcraftEngineMenus;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -15,8 +15,6 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamCommercial;
-import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteam;
 
 public class CommercialEngineMenu extends AbstractContainerMenu {
 
@@ -43,11 +41,11 @@ public class CommercialEngineMenu extends AbstractContainerMenu {
             @Override
             public int get(int index) {
                 return switch (index) {
-                    case 0 -> engine.getSteamTank().getFluidAmount();
-                    case 1 -> engine.getSteamTank().getCapacity();
-                    case 2 -> (int) engine.getEnergyStored();
-                    case 3 -> (int) engine.getMaxEnergy();
-                    case 4 -> (int) Math.round(engine.currentOutput * 100);
+                    case 0 -> engine.getSteamAmount();
+                    case 1 -> engine.getSteamCapacity();
+                    case 2 -> boundedInt(engine.getEnergyStored());
+                    case 3 -> boundedInt(engine.getMaxEnergy());
+                    case 4 -> boundedInt(Math.round(engine.currentOutput * 100));
                     case 5 -> engine.getEnergyStage().ordinal();
                     default -> 0;
                 };
@@ -63,6 +61,7 @@ public class CommercialEngineMenu extends AbstractContainerMenu {
             }
         };
 
+        checkContainerDataCount(data, DATA_COUNT);
         addDataSlots(data);
 
         for (int row = 0; row < 3; row++) {
@@ -79,6 +78,10 @@ public class CommercialEngineMenu extends AbstractContainerMenu {
         for (int column = 0; column < 9; column++) {
             addSlot(new Slot(inventory, column, 8 + column * 18, 142));
         }
+    }
+
+    private static int boundedInt(long value) {
+        return (int) Math.clamp(value, 0L, (long) Integer.MAX_VALUE);
     }
 
     public int getSteamAmount() {

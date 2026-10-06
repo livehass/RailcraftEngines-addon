@@ -12,7 +12,7 @@ public final class RailcraftEngineCapabilities {
             RegisterCapabilitiesEvent event
     ) {
         event.registerBlockEntity(
-                Capabilities.ItemHandler.BLOCK,
+                Capabilities.Item.BLOCK,
                 RailcraftEngineBlockEntities.HOBBYIST_STEAM_ENGINE.get(),
                 (engine, side) -> side == engine.getFacing()
                         ? null
@@ -20,29 +20,23 @@ public final class RailcraftEngineCapabilities {
         );
 
         event.registerBlockEntity(
-                Capabilities.FluidHandler.BLOCK,
+                Capabilities.Fluid.BLOCK,
                 RailcraftEngineBlockEntities.HOBBYIST_STEAM_ENGINE.get(),
-                (engine, side) -> {
-                    if (side != null
-                            && side == engine.getFacing()) {
-                        return null;
-                    }
-
-                    return engine.getFluidInputHandler();
-                }
+                (engine, side) -> side == engine.getFacing()
+                        ? null
+                        : engine.getFluidInputHandler()
         );
 
         event.registerBlockEntity(
-                Capabilities.EnergyStorage.BLOCK,
+                Capabilities.Energy.BLOCK,
                 RailcraftEngineBlockEntities.HOBBYIST_STEAM_ENGINE.get(),
                 (engine, side) -> side == engine.getFacing()
                         ? engine.getEnergyConnection()
                         : null
         );
 
-
         event.registerBlockEntity(
-                Capabilities.FluidHandler.BLOCK,
+                Capabilities.Fluid.BLOCK,
                 RailcraftEngineBlockEntities.COMMERCIAL_STEAM_ENGINE.get(),
                 (engine, side) -> side == engine.getFacing()
                         ? null
@@ -50,7 +44,7 @@ public final class RailcraftEngineCapabilities {
         );
 
         event.registerBlockEntity(
-                Capabilities.EnergyStorage.BLOCK,
+                Capabilities.Energy.BLOCK,
                 RailcraftEngineBlockEntities.COMMERCIAL_STEAM_ENGINE.get(),
                 (engine, side) -> side == engine.getFacing()
                         ? engine.getEnergyConnection()
@@ -58,7 +52,7 @@ public final class RailcraftEngineCapabilities {
         );
 
         event.registerBlockEntity(
-                Capabilities.FluidHandler.BLOCK,
+                Capabilities.Fluid.BLOCK,
                 RailcraftEngineBlockEntities.INDUSTRIAL_STEAM_ENGINE.get(),
                 (engine, side) -> side == engine.getFacing()
                         ? null
@@ -66,13 +60,11 @@ public final class RailcraftEngineCapabilities {
         );
 
         event.registerBlockEntity(
-                Capabilities.EnergyStorage.BLOCK,
+                Capabilities.Energy.BLOCK,
                 RailcraftEngineBlockEntities.INDUSTRIAL_STEAM_ENGINE.get(),
                 (engine, side) -> side == engine.getFacing()
                         ? engine.getEnergyConnection()
                         : null
         );
-
-
     }
 }

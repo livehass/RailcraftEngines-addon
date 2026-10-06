@@ -3,21 +3,22 @@ package com.sieuus.railcraftengines.common.blocks.logic;
 import com.sieuus.railcraftengines.common.util.steam.IFuelProvider;
 import com.sieuus.railcraftengines.common.util.steam.SteamConstants;
 import com.sieuus.railcraftengines.integration.railcraft.RailcraftFluids;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
+import net.neoforged.neoforge.transfer.fluid.FluidStacksResourceHandler;
 
 public final class BoilerLogic {
 
     private final BoilerData boilerData;
     private final IFuelProvider fuelProvider;
-    private final FluidTank waterTank;
-    private final FluidTank steamTank;
+    private final FluidStacksResourceHandler waterTank;
+    private final FluidStacksResourceHandler steamTank;
     private final Runnable onChanged;
 
     private int burnCycle;
@@ -31,7 +32,7 @@ public final class BoilerLogic {
 
     public BoilerLogic(
             BoilerData boilerData,
-            FluidTank steamTank,
+            FluidStacksResourceHandler steamTank,
             IFuelProvider fuelProvider,
             Runnable onChanged
     ) {
@@ -40,12 +41,15 @@ public final class BoilerLogic {
         this.fuelProvider = fuelProvider;
         this.onChanged = onChanged;
 
-        this.waterTank = new FluidTank(
-                boilerData.waterCapacity(),
-                stack -> stack.is(FluidTags.WATER)
-        ) {
+        this.waterTank = new FluidStacksResourceHandler(1, boilerData.waterCapacity()) {
             @Override
-            protected void onContentsChanged() {
+            public boolean isValid(int index, FluidResource resource) {
+                return index == 0 && !resource.isEmpty()
+                        && resource.toStack(1).is(FluidTags.WATER);
+            }
+
+            @Override
+            protected void onContentsChanged(int index, FluidStack previousContents) {
                 onChanged.run();
             }
         };
@@ -135,62 +139,45 @@ public final class BoilerLogic {
 
         partialConversions -= waterCost;
 
-        int availableWater =
-                Math.min(
-                        waterCost,
-                        waterTank.getFluidAmount()
-                );
-
+        int availableWater = Math.min(waterCost, getWaterAmount());
         if (availableWater <= 0) {
             return 0;
         }
 
         Fluid steamFluid = RailcraftFluids.getSteam();
-
         if (steamFluid == Fluids.EMPTY) {
             return 0;
         }
 
-        int steamAmount =
-                SteamConstants.STEAM_PER_UNIT_WATER
-                        * availableWater;
-
-        int availableSteamSpace =
-                steamTank.getCapacity()
-                        - steamTank.getFluidAmount();
-
-        int maxWaterForAvailableSteam =
-                availableSteamSpace
-                        / SteamConstants.STEAM_PER_UNIT_WATER;
-
-        availableWater =
-                Math.min(
-                        availableWater,
-                        maxWaterForAvailableSteam
-                );
-
+        FluidResource steamResource = FluidResource.of(steamFluid);
+        int steamPerWater = SteamConstants.STEAM_PER_UNIT_WATER;
+        long availableSteamSpace = Math.max(0L,
+                steamTank.getCapacityAsLong(0, steamResource)
+                        - steamTank.getAmountAsLong(0));
+        availableWater = (int) Math.min(availableWater,
+                Math.min(availableSteamSpace, Integer.MAX_VALUE) / steamPerWater);
         if (availableWater <= 0) {
             return 0;
         }
 
-        steamAmount =
-                availableWater
-                        * SteamConstants.STEAM_PER_UNIT_WATER;
+        int steamAmount = availableWater * steamPerWater;
 
-        waterTank.drain(
-                availableWater,
-                IFluidHandler.FluidAction.EXECUTE
-        );
+        // Commit both changes together; a rejected insertion must not consume water.
+        try (Transaction transaction = Transaction.openRoot()) {
+            int extracted = waterTank.extract(
+                    0, waterTank.getResource(0), availableWater, transaction);
+            if (extracted != availableWater) {
+                return 0;
+            }
 
-        int filled = steamTank.fill(
-                new FluidStack(
-                        steamFluid,
-                        steamAmount
-                ),
-                IFluidHandler.FluidAction.EXECUTE
-        );
+            int inserted = steamTank.insert(0, steamResource, steamAmount, transaction);
+            if (inserted != steamAmount) {
+                return 0;
+            }
 
-        return filled;
+            transaction.commit();
+            return inserted;
+        }
     }
 
     public void increaseTemperature() {
@@ -270,102 +257,75 @@ public final class BoilerLogic {
         return currentItemBurnTime;
     }
 
-    public FluidTank getWaterTank() {
+    public FluidStacksResourceHandler getWaterTank() {
         return waterTank;
     }
 
-    public FluidTank getSteamTank() {
+    public FluidStacksResourceHandler getSteamTank() {
         return steamTank;
     }
 
+    public int getWaterAmount() {
+        return waterTank.getAmountAsInt(0);
+    }
+
+    public int getWaterCapacity() {
+        return boilerData.waterCapacity();
+    }
+
     public boolean needsFuel() {
-        if (waterTank.getFluidAmount()
-                < waterTank.getCapacity() / 3) {
+        if (getWaterAmount()
+                < getWaterCapacity() / 3) {
             return true;
         }
 
         return fuelProvider.needsFuel();
     }
 
-    public void load(
-            CompoundTag tag,
-            HolderLookup.Provider registries
-    ) {
-        temperature =
-                tag.contains("BoilerTemperature")
-                        ? tag.getDouble("BoilerTemperature")
-                        : SteamConstants.COLD_TEMP;
+    public void load(ValueInput input) {
+        temperature = input.getDoubleOr(
+                "BoilerTemperature",
+                SteamConstants.COLD_TEMP
+        );
+        burnTime = input.getDoubleOr("BoilerBurnTime", 0.0D);
+        currentItemBurnTime = input.getDoubleOr(
+                "BoilerCurrentItemBurnTime",
+                0.0D
+        );
+        partialConversions = input.getDoubleOr(
+                "BoilerPartialConversions",
+                0.0D
+        );
+        burnCycle = input.getIntOr("BoilerBurnCycle", 0);
+        burning = input.getBooleanOr(
+                "BoilerBurning",
+                burnTime >= getFuelPerCycle()
+        );
 
-        burnTime =
-                tag.getDouble("BoilerBurnTime");
-
-        currentItemBurnTime =
-                tag.getDouble("BoilerCurrentItemBurnTime");
-
-        partialConversions =
-                tag.getDouble("BoilerPartialConversions");
-
-        burnCycle =
-                tag.getInt("BoilerBurnCycle");
-
-        burning = tag.contains("BoilerBurning")
-                ? tag.getBoolean("BoilerBurning")
-                : burnTime >= getFuelPerCycle();
-
-        if (tag.contains("BoilerWaterTank")) {
-            waterTank.readFromNBT(
-                    registries,
-                    tag.getCompound("BoilerWaterTank")
-            );
+        // Preserve the legacy FluidTank save format without depending on that class.
+        FluidStack storedWater = input.childOrEmpty("BoilerWaterTank")
+                .read("Fluid", FluidStack.CODEC).orElse(FluidStack.EMPTY);
+        if (!storedWater.isEmpty() && storedWater.is(FluidTags.WATER)) {
+            waterTank.set(0, FluidResource.of(storedWater),
+                    Math.min(storedWater.getAmount(), getWaterCapacity()));
+        } else {
+            waterTank.set(0, FluidResource.EMPTY, 0);
         }
     }
 
-    public void save(
-            CompoundTag tag,
-            HolderLookup.Provider registries
-    ) {
-        tag.putBoolean(
-                "BoilerBurning",
-                burning
-        );
+    public void save(ValueOutput output) {
+        output.putBoolean("BoilerBurning", burning);
+        output.putDouble("BoilerTemperature", temperature);
+        output.putDouble("BoilerBurnTime", burnTime);
+        output.putDouble("BoilerCurrentItemBurnTime", currentItemBurnTime);
+        output.putDouble("BoilerPartialConversions", partialConversions);
+        output.putInt("BoilerBurnCycle", burnCycle);
 
-        tag.putDouble(
-                "BoilerTemperature",
-                temperature
-        );
-
-        tag.putDouble(
-                "BoilerBurnTime",
-                burnTime
-        );
-
-        tag.putDouble(
-                "BoilerCurrentItemBurnTime",
-                currentItemBurnTime
-        );
-
-        tag.putDouble(
-                "BoilerPartialConversions",
-                partialConversions
-        );
-
-        tag.putInt(
-                "BoilerBurnCycle",
-                burnCycle
-        );
-
-        CompoundTag waterTag =
-                new CompoundTag();
-
-        waterTank.writeToNBT(
-                registries,
-                waterTag
-        );
-
-        tag.put(
-                "BoilerWaterTank",
-                waterTag
-        );
+        ValueOutput tankOutput = output.child("BoilerWaterTank");
+        if (getWaterAmount() > 0) {
+            tankOutput.store("Fluid", FluidStack.CODEC,
+                    waterTank.getResource(0).toStack(getWaterAmount()));
+        }
     }
 
     public record BoilerData(

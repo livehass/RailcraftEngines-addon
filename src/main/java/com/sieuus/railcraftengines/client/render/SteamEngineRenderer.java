@@ -6,46 +6,52 @@
  * https://github.com/Railcraft/Railcraft
  *
  * Legacy source branch: mc-1.7.10
- * Adapted for Minecraft 1.21.1 / NeoForge by sieuus.
+ * Adapted for Minecraft 26.1.2 / NeoForge by sieuus.
  */
 
 package com.sieuus.railcraftengines.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import com.sieuus.railcraftengines.RailcraftEngines;
 import com.sieuus.railcraftengines.client.render.models.engine.ModelEngineBase;
 import com.sieuus.railcraftengines.client.render.models.engine.ModelEngineFrame;
 import com.sieuus.railcraftengines.client.render.models.engine.ModelEnginePiston;
 import com.sieuus.railcraftengines.client.render.models.engine.ModelEngineTrunk;
-import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamHobby;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
+import com.sieuus.railcraftengines.common.blocks.engine.TileEngine;
 import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteam;
 import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamCommercial;
 import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteamIndustrial;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.Vec3;
 
 public final class SteamEngineRenderer<T extends TileEngineSteam>
-        implements BlockEntityRenderer<T> {
+        implements BlockEntityRenderer<T, SteamEngineRenderer.EngineRenderState> {
 
-    private static final ResourceLocation HOBBYIST_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(
+
+    private static final Identifier HOBBYIST_TEXTURE =
+            Identifier.fromNamespaceAndPath(
                     RailcraftEngines.MODID,
                     "textures/block/engine/steam_hobby.png"
             );
-    private static final ResourceLocation COMMERCIAL_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(
+    private static final Identifier COMMERCIAL_TEXTURE =
+            Identifier.fromNamespaceAndPath(
                     RailcraftEngines.MODID,
                     "textures/block/engine/steam_low.png"
             );
 
-    private static final ResourceLocation INDUSTRIAL_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(
+    private static final Identifier INDUSTRIAL_TEXTURE =
+            Identifier.fromNamespaceAndPath(
                     RailcraftEngines.MODID,
                     "textures/block/engine/steam_high.png"
             );
@@ -58,6 +64,13 @@ public final class SteamEngineRenderer<T extends TileEngineSteam>
     private final ModelEngineFrame frame;
     private final ModelEnginePiston piston;
     private final ModelEngineTrunk trunk;
+
+    public static final class EngineRenderState extends BlockEntityRenderState {
+        public Direction facing;
+        public float progress;
+        public TileEngine.EnergyStage energyStage;
+        public Identifier texture;
+    }
 
     public SteamEngineRenderer(
             BlockEntityRendererProvider.Context context
@@ -80,140 +93,126 @@ public final class SteamEngineRenderer<T extends TileEngineSteam>
     }
 
     @Override
-    public void render(
+    public EngineRenderState createRenderState() {
+        return new EngineRenderState();
+    }
+
+    @Override
+    public void extractRenderState(
             T engine,
+            EngineRenderState state,
             float partialTick,
-            PoseStack poseStack,
-            MultiBufferSource bufferSource,
-            int packedLight,
-            int packedOverlay
+            Vec3 cameraPosition,
+            ModelFeatureRenderer.CrumblingOverlay breakProgress
     ) {
-        ResourceLocation texture;
+        BlockEntityRenderer.super.extractRenderState(
+                engine,
+                state,
+                partialTick,
+                cameraPosition,
+                breakProgress
+        );
+
+        state.facing = engine.getFacing();
+        state.progress = engine.getProgress();
+        state.energyStage = engine.getEnergyStage();
 
         if (engine instanceof TileEngineSteamIndustrial) {
-            texture = INDUSTRIAL_TEXTURE;
+            state.texture = INDUSTRIAL_TEXTURE;
         } else if (engine instanceof TileEngineSteamCommercial) {
-            texture = COMMERCIAL_TEXTURE;
+            state.texture = COMMERCIAL_TEXTURE;
         } else {
-            texture = HOBBYIST_TEXTURE;
+            state.texture = HOBBYIST_TEXTURE;
         }
-
-        VertexConsumer consumer = bufferSource.getBuffer(
-                RenderType.entityCutout(texture)
-        );
-        poseStack.pushPose();
-
-        poseStack.translate(
-                0.5D,
-                0.5D,
-                0.5D
-        );
-
-        applyFacing(
-                poseStack,
-                engine.getFacing()
-        );
-
-        poseStack.translate(
-                -0.5D,
-                -0.5D,
-                -0.5D
-        );
-
-        float step = getPistonTravel(
-                engine.getProgress()
-        );
-
-        trunk.render(
-                engine.getEnergyStage(),
-                poseStack,
-                consumer,
-                packedLight,
-                packedOverlay
-        );
-
-        base.render(
-                poseStack,
-                consumer,
-                packedLight,
-                packedOverlay
-        );
-
-        renderFrame(
-                step,
-                poseStack,
-                consumer,
-                packedLight,
-                packedOverlay
-        );
-
-        renderPiston(
-                step,
-                poseStack,
-                consumer,
-                packedLight,
-                packedOverlay
-        );
-
-        poseStack.popPose();
     }
 
-    private void renderFrame(
-            float step,
+    @Override
+    public void submit(
+            EngineRenderState state,
             PoseStack poseStack,
-            VertexConsumer consumer,
-            int packedLight,
-            int packedOverlay
+            SubmitNodeCollector collector,
+            CameraRenderState camera
     ) {
+        RenderType renderType = RenderTypes.entityCutoutCull(state.texture);
+        int light = state.lightCoords;
+
         poseStack.pushPose();
+        poseStack.translate(0.5D, 0.5D, 0.5D);
+        applyFacing(poseStack, state.facing);
+        poseStack.translate(-0.5D, -0.5D, -0.5D);
 
-        poseStack.translate(
-                0.0D,
-                step / 16.0F,
-                0.0D
-        );
-
-        frame.render(
+        submitPart(
+                trunk.getPart(state.energyStage),
                 poseStack,
-                consumer,
-                packedLight,
-                packedOverlay
+                collector,
+                renderType,
+                light,
+                state.breakProgress
         );
 
-        poseStack.popPose();
-    }
+        submitPart(
+                base.getPart(),
+                poseStack,
+                collector,
+                renderType,
+                light,
+                state.breakProgress
+        );
 
-    private void renderPiston(
-            float step,
-            PoseStack poseStack,
-            VertexConsumer consumer,
-            int packedLight,
-            int packedOverlay
-    ) {
+        float step = getPistonTravel(state.progress);
+
         poseStack.pushPose();
-
-        poseStack.translate(
-                0.0D,
-                -PISTON_PREP,
-                0.0D
+        poseStack.translate(0.0D, step / 16.0F, 0.0D);
+        submitPart(
+                frame.getPart(),
+                poseStack,
+                collector,
+                renderType,
+                light,
+                state.breakProgress
         );
+        poseStack.popPose();
+
+        poseStack.pushPose();
+        poseStack.translate(0.0D, -PISTON_PREP, 0.0D);
 
         for (int i = 0; i <= step + 2.0F; i += 2) {
-            piston.render(
+            submitPart(
+                    piston.getPart(),
                     poseStack,
-                    consumer,
-                    packedLight,
-                    packedOverlay
+                    collector,
+                    renderType,
+                    light,
+                    state.breakProgress
             );
-
-            poseStack.translate(
-                    0.0D,
-                    PISTON_SEGMENT,
-                    0.0D
-            );
+            poseStack.translate(0.0D, PISTON_SEGMENT, 0.0D);
         }
 
         poseStack.popPose();
+        poseStack.popPose();
+    }
+
+    private static void submitPart(
+            net.minecraft.client.model.geom.ModelPart part,
+            PoseStack poseStack,
+            SubmitNodeCollector collector,
+            RenderType renderType,
+            int light,
+            ModelFeatureRenderer.CrumblingOverlay breakProgress
+    ) {
+        collector.submitModelPart(
+                part,
+                poseStack,
+                renderType,
+                light,
+                OverlayTexture.NO_OVERLAY,
+                null,
+                false,
+                false,
+                0xFFFFFFFF,
+                breakProgress,
+                0
+        );
     }
 
     private static float getPistonTravel(

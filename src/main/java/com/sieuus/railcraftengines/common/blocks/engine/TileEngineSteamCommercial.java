@@ -2,7 +2,7 @@
  * Portions derived from Railcraft by CovertJaguar.
  * Original project: https://github.com/Railcraft/Railcraft
  * Reference branch: mc-1.7.10
- * Adapted for Minecraft 1.21.1 / NeoForge by sieuus.
+ * Adapted for Minecraft 26.1.2 / NeoForge by sieuus.
  */
 
 package com.sieuus.railcraftengines.common.blocks.engine;
@@ -14,7 +14,7 @@ import com.sieuus.railcraftengines.registry.RailcraftEngineBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -32,7 +32,7 @@ public class TileEngineSteamCommercial extends TileEngineSteam
 
     private static final TagKey<Fluid> STEAM_TAG = TagKey.create(
             Registries.FLUID,
-            ResourceLocation.fromNamespaceAndPath("c", "steam")
+            Identifier.fromNamespaceAndPath("c", "steam")
     );
 
     private final IFluidHandler fluidInput = new IFluidHandler() {

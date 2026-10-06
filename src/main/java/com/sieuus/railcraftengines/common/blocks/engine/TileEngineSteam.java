@@ -6,7 +6,7 @@
  * https://github.com/Railcraft/Railcraft
  *
  * Legacy source branch: mc-1.7.10
- * Adapted for Minecraft 1.21.1 / NeoForge by sieuus.
+ * Adapted for Minecraft 26.1.2 / NeoForge by sieuus.
  */
 
 package com.sieuus.railcraftengines.common.blocks.engine;
@@ -14,10 +14,10 @@ package com.sieuus.railcraftengines.common.blocks.engine;
 import com.sieuus.railcraftengines.common.util.steam.SteamConstants;
 import com.sieuus.railcraftengines.integration.railcraft.RailcraftFluids;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -154,46 +154,19 @@ public abstract class TileEngineSteam extends TileEngine {
     public abstract int steamUsedPerTick();
 
     @Override
-    public void loadAdditional(
-            CompoundTag tag,
-            HolderLookup.Provider registries
-    ) {
-        super.loadAdditional(tag, registries);
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
 
-        if (tag.contains("SteamTank")) {
-            steamTank.readFromNBT(
-                    registries,
-                    tag.getCompound("SteamTank")
-            );
-        }
-
-        steamUsed = tag.getInt("SteamUsed");
+        steamTank.deserialize(input.childOrEmpty("SteamTank"));
+        steamUsed = input.getIntOr("SteamUsed", 0);
     }
 
     @Override
-    public void saveAdditional(
-            CompoundTag tag,
-            HolderLookup.Provider registries
-    ) {
-        super.saveAdditional(tag, registries);
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
 
-        CompoundTag steamTag =
-                new CompoundTag();
-
-        steamTank.writeToNBT(
-                registries,
-                steamTag
-        );
-
-        tag.put(
-                "SteamTank",
-                steamTag
-        );
-
-        tag.putInt(
-                "SteamUsed",
-                steamUsed
-        );
+        steamTank.serialize(output.child("SteamTank"));
+        output.putInt("SteamUsed", steamUsed);
     }
 
     @Override

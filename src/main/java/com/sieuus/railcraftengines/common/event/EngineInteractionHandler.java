@@ -9,7 +9,7 @@ import net.minecraft.world.InteractionResult;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.common.util.TriState;
+import net.minecraft.util.TriState;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
 @EventBusSubscriber(modid = RailcraftEngines.MODID)
@@ -58,8 +58,9 @@ public final class EngineInteractionHandler {
 
         // Prevent the crowbar's default rotation and menu interaction.
         event.setCanceled(true);
-        event.setCancellationResult(
-                InteractionResult.sidedSuccess(level.isClientSide()));
+        event.setCancellationResult(level.isClientSide()
+                ? InteractionResult.SUCCESS
+                : InteractionResult.CONSUME);
 
         if (!(player instanceof ServerPlayer serverPlayer)) {
             return;

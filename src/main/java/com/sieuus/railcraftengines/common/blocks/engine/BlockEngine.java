@@ -155,7 +155,6 @@ public class BlockEngine extends Block implements EntityBlock {
     }
 
     @Override
-    @OnlyIn(Dist.CLIENT)
     public void animateTick(BlockState state, Level level,
                             BlockPos pos, RandomSource random) {
         if (!(level.getBlockEntity(pos) instanceof TileEngineSteam engine)) {

@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "railcraftengines:item/steam_engine_base",
+    "model": {
+      "type": "railcraftengines:steam_engine",
+      "engine": "hobbyist"
+    }
+  }
+}

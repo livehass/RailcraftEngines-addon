@@ -6,13 +6,11 @@
  * https://github.com/Railcraft/Railcraft
  *
  * Legacy source branch: mc-1.7.10
- * Adapted for Minecraft 1.21.1 / NeoForge by sieuus.
+ * Adapted for Minecraft 26.1.2 / NeoForge by sieuus.
  */
 
 package com.sieuus.railcraftengines.client.render.models.engine;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.sieuus.railcraftengines.RailcraftEngines;
 import com.sieuus.railcraftengines.common.blocks.engine.TileEngine;
 import net.minecraft.client.model.geom.ModelLayerLocation;
@@ -22,13 +20,13 @@ import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public final class ModelEngineTrunk {
 
     public static final ModelLayerLocation LAYER =
             new ModelLayerLocation(
-                    ResourceLocation.fromNamespaceAndPath(
+                    Identifier.fromNamespaceAndPath(
                             RailcraftEngines.MODID,
                             "steam_engine_trunk"
                     ),
@@ -124,26 +122,13 @@ public final class ModelEngineTrunk {
         );
     }
 
-    public void render(
-            TileEngine.EnergyStage stage,
-            PoseStack poseStack,
-            VertexConsumer consumer,
-            int packedLight,
-            int packedOverlay
-    ) {
-        ModelPart part = switch (stage) {
+    public ModelPart getPart(TileEngine.EnergyStage stage) {
+        return switch (stage) {
             case BLUE -> blue;
             case GREEN -> green;
             case YELLOW -> yellow;
             case ORANGE -> orange;
             case RED, OVERHEAT -> red;
         };
-
-        part.render(
-                poseStack,
-                consumer,
-                packedLight,
-                packedOverlay
-        );
     }
 }

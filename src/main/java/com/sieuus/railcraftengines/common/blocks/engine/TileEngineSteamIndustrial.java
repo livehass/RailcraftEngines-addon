@@ -3,7 +3,7 @@
  * Railcraft copyright (c) CovertJaguar.
  * Original project: https://github.com/Railcraft/Railcraft
  * Reference branch: mc-1.7.10
- * Adapted for Minecraft 1.21.1 / NeoForge by sieuus.
+ * Adapted for Minecraft 26.1.2 / NeoForge by sieuus.
  */
 
 package com.sieuus.railcraftengines.common.blocks.engine;
@@ -15,7 +15,7 @@ import com.sieuus.railcraftengines.registry.RailcraftEngineBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -24,7 +24,11 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.transfer.DelegatingResourceHandler;
+import net.neoforged.neoforge.transfer.ResourceHandler;
+import net.neoforged.neoforge.transfer.TransferPreconditions;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 
 public class TileEngineSteamIndustrial extends TileEngineSteam
         implements MenuProvider {
@@ -33,45 +37,41 @@ public class TileEngineSteamIndustrial extends TileEngineSteam
 
     private static final TagKey<Fluid> STEAM_TAG = TagKey.create(
             Registries.FLUID,
-            ResourceLocation.fromNamespaceAndPath("c", "steam")
+            Identifier.fromNamespaceAndPath("c", "steam")
     );
 
-    private final IFluidHandler fluidInput = new IFluidHandler() {
-        @Override
-        public int getTanks() {
-            return 1;
-        }
+    private final ResourceHandler<FluidResource> fluidInput =
+            new DelegatingResourceHandler<FluidResource>(steamTank) {
+                @Override
+                public int insert(int index, FluidResource resource, int amount,
+                                  TransactionContext transaction) {
+                    TransferPreconditions.checkNonEmptyNonNegative(resource, amount);
+                    int tank = convertIndex(index);
+                    return isPowered()
+                            ? steamTank.insert(tank, resource, amount, transaction)
+                            : 0;
+                }
 
-        @Override
-        public FluidStack getFluidInTank(int tank) {
-            return tank == 0 ? steamTank.getFluid() : FluidStack.EMPTY;
-        }
+                @Override
+                public int insert(FluidResource resource, int amount,
+                                  TransactionContext transaction) {
+                    return insert(0, resource, amount, transaction);
+                }
 
-        @Override
-        public int getTankCapacity(int tank) {
-            return tank == 0 ? steamTank.getCapacity() : 0;
-        }
+                @Override
+                public int extract(int index, FluidResource resource, int amount,
+                                   TransactionContext transaction) {
+                    TransferPreconditions.checkNonEmptyNonNegative(resource, amount);
+                    convertIndex(index);
+                    return 0;
+                }
 
-        @Override
-        public boolean isFluidValid(int tank, FluidStack stack) {
-            return tank == 0 && isAcceptedSteam(stack);
-        }
-
-        @Override
-        public int fill(FluidStack resource, FluidAction action) {
-            return isPowered() ? steamTank.fill(resource, action) : 0;
-        }
-
-        @Override
-        public FluidStack drain(FluidStack resource, FluidAction action) {
-            return FluidStack.EMPTY;
-        }
-
-        @Override
-        public FluidStack drain(int maxDrain, FluidAction action) {
-            return FluidStack.EMPTY;
-        }
-    };
+                @Override
+                public int extract(FluidResource resource, int amount,
+                                   TransactionContext transaction) {
+                    return extract(0, resource, amount, transaction);
+                }
+            };
 
     public TileEngineSteamIndustrial(BlockPos pos, BlockState state) {
         super(
@@ -79,16 +79,15 @@ public class TileEngineSteamIndustrial extends TileEngineSteam
                 pos,
                 state
         );
-
-        steamTank.setValidator(TileEngineSteamIndustrial::isAcceptedSteam);
     }
 
-    private static boolean isAcceptedSteam(FluidStack stack) {
+    @Override
+    protected boolean isSteamValidForTank(FluidStack stack) {
         return !stack.isEmpty()
                 && (stack.is(STEAM_TAG) || RailcraftFluids.isSteam(stack));
     }
 
-    public IFluidHandler getFluidInputHandler() {
+    public ResourceHandler<FluidResource> getFluidInputHandler() {
         return fluidInput;
     }
 

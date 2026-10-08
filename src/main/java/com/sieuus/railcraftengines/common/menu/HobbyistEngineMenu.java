@@ -11,9 +11,13 @@ import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.fluids.capability.IFluidHandlerItem;
-import net.neoforged.neoforge.items.ItemStackHandler;
-import net.neoforged.neoforge.items.SlotItemHandler;
+import net.neoforged.neoforge.transfer.ResourceHandler;
+import net.neoforged.neoforge.transfer.access.ItemAccess;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.item.ItemResource;
+import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
+import net.neoforged.neoforge.transfer.item.ResourceHandlerSlot;
+import net.minecraft.world.item.crafting.RecipeType;
 
 public final class HobbyistEngineMenu extends AbstractContainerMenu {
 
@@ -35,14 +39,14 @@ public final class HobbyistEngineMenu extends AbstractContainerMenu {
     private final TileEngineSteamHobby engine;
     private final ContainerData data;
 
-    // Construtor usado pelo cliente.
+    // Client-side constructor.
     public HobbyistEngineMenu(int containerId, Inventory playerInventory) {
         this(containerId, playerInventory, null,
-                new ItemStackHandler(ENGINE_SLOT_COUNT),
+                new ItemStacksResourceHandler(ENGINE_SLOT_COUNT),
                 new SimpleContainerData(DATA_COUNT));
     }
 
-    // Construtor usado pelo servidor.
+    // Server-side constructor.
     public HobbyistEngineMenu(int containerId, Inventory playerInventory,
                               TileEngineSteamHobby engine) {
         this(containerId, playerInventory, engine, engine.getInventory(),
@@ -51,22 +55,24 @@ public final class HobbyistEngineMenu extends AbstractContainerMenu {
 
     private HobbyistEngineMenu(int containerId, Inventory playerInventory,
                                TileEngineSteamHobby engine,
-                               ItemStackHandler inventory, ContainerData data) {
+                               ItemStacksResourceHandler inventory, ContainerData data) {
         super(RailcraftEngineMenus.HOBBYIST_ENGINE.get(), containerId);
         this.engine = engine;
         this.data = data;
 
         checkContainerDataCount(data, DATA_COUNT);
 
-        addSlot(new SlotItemHandler(inventory,
+        addSlot(new ResourceHandlerSlot(inventory, inventory::set,
                 TileEngineSteamHobby.SLOT_FUEL, 62, 39) {
             @Override
             public boolean mayPlace(ItemStack stack) {
-                return TileEngineSteamHobby.isValidFuel(stack);
+                return !stack.isEmpty() && stack.getBurnTime(
+                        RecipeType.SMELTING,
+                        playerInventory.player.level().fuelValues()) > 0;
             }
         });
 
-        addSlot(new SlotItemHandler(inventory,
+        addSlot(new ResourceHandlerSlot(inventory, inventory::set,
                 TileEngineSteamHobby.SLOT_LIQUID_INPUT, 143, 21) {
             @Override
             public boolean mayPlace(ItemStack stack) {
@@ -74,7 +80,7 @@ public final class HobbyistEngineMenu extends AbstractContainerMenu {
             }
         });
 
-        addSlot(new SlotItemHandler(inventory,
+        addSlot(new ResourceHandlerSlot(inventory, inventory::set,
                 TileEngineSteamHobby.SLOT_LIQUID_OUTPUT, 143, 56) {
             @Override
             public boolean mayPlace(ItemStack stack) {
@@ -104,10 +110,10 @@ public final class HobbyistEngineMenu extends AbstractContainerMenu {
                 var boiler = engine.getBoiler();
 
                 return switch (index) {
-                    case WATER -> engine.getWaterTank().getFluidAmount();
-                    case WATER_CAPACITY -> engine.getWaterTank().getCapacity();
-                    case STEAM -> engine.getSteamTank().getFluidAmount();
-                    case STEAM_CAPACITY -> engine.getSteamTank().getCapacity();
+                    case WATER -> boiler.getWaterAmount();
+                    case WATER_CAPACITY -> boiler.getWaterCapacity();
+                    case STEAM -> engine.getSteamAmount();
+                    case STEAM_CAPACITY -> engine.getSteamCapacity();
                     case TEMPERATURE ->
                             (int) Math.round(boiler.getTemperature() * 10);
                     case MAX_TEMPERATURE ->
@@ -130,7 +136,7 @@ public final class HobbyistEngineMenu extends AbstractContainerMenu {
 
             @Override
             public void set(int index, int value) {
-                // No servidor, os valores são lidos diretamente do motor.
+                // Server-side values are read directly from the engine.
             }
 
             @Override
@@ -149,16 +155,19 @@ public final class HobbyistEngineMenu extends AbstractContainerMenu {
             return false;
         }
 
-        IFluidHandlerItem handler =
-                stack.getCapability(Capabilities.FluidHandler.ITEM);
+        ItemStacksResourceHandler container = new ItemStacksResourceHandler(1);
+        container.set(0, ItemResource.of(stack), 1);
+        ResourceHandler<FluidResource> handler =
+                ItemAccess.forHandlerIndexStrict(container, 0)
+                        .getCapability(Capabilities.Fluid.ITEM);
 
         if (handler == null) {
             return false;
         }
 
-        for (int tank = 0; tank < handler.getTanks(); tank++) {
-            var fluid = handler.getFluidInTank(tank);
-            if (!fluid.isEmpty() && fluid.is(FluidTags.WATER)) {
+        for (int tank = 0; tank < handler.size(); tank++) {
+            if (handler.getAmountAsLong(tank) > 0
+                    && handler.getResource(tank).toStack(1).is(FluidTags.WATER)) {
                 return true;
             }
         }

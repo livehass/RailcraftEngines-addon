@@ -15,7 +15,7 @@ sourceSets.main.resources {
     srcDir('src/generated/resources')
 
     exclude("**/*.bbmodel") // BlockBench project files
-    exclude("src/generated/**/.cache") // datagen cache files
+    exclude("**/.cache/**") // datagen cache files
 }
 
 repositories {
@@ -40,7 +40,7 @@ base {
     archivesName = mod_id
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 runs {
 
     configureEach {
@@ -62,7 +62,7 @@ runs {
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
     }
 
-    data {
+    clientData {
         arguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
     }
 }
@@ -75,30 +75,10 @@ dependencies {
 
     implementation "net.neoforged:neoforge:${neo_version}"
 
-    // Railcraft Reborn 1.21.1 - 1.2.10
-    implementation "curse.maven:railcraft-reborn-901491:7393678"
+    // Railcraft Reborn 26.1.2 - 1.4.4
+    implementation "curse.maven:railcraft-reborn-901491:8953043"
 
-    // Example optional mod dependency with JEI
-    // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
-    //compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
-    //compileOnly "mezz.jei:jei-${mc_version}-neoforge-api:${jei_version}"
-    // We add the full version to localRuntime, not runtimeOnly, so that we do not publish a dependency on it
-    // localRuntime "mezz.jei:jei-${mc_version}-neoforge:${jei_version}"
 
-    // Example mod dependency using a mod jar from ./libs with a flat dir repository
-    // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
-    // The group id is ignored when searching -- in this case, it is "blank"
-    // implementation "blank:coolmod-${mc_version}:${coolmod_version}"
-
-    // Example mod dependency using a file as dependency
-    // implementation files("libs/coolmod-${mc_version}-${coolmod_version}.jar")
-
-    // Example project dependency using a sister or child project:
-    // implementation project(":myproject")
-
-    // For more info:
-    // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
-    // http://www.gradle.org/docs/current/userguide/dependency_management.html
 }
 tasks.withType(ProcessResources).configureEach {
     var replaceProperties = [
@@ -128,7 +108,7 @@ publishing {
     }
     repositories {
         maven {
-            url "file://${project.projectDir}/repo"
+            url = uri('repo')
         }
     }
 }

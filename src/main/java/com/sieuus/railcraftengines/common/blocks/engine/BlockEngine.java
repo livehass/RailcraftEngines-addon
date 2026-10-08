@@ -17,8 +17,9 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.BlockHitResult;
@@ -30,11 +31,10 @@ import net.minecraft.client.particle.Particle;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.minecraft.world.Containers;
-import net.minecraft.world.item.ItemStack;
 
 public class BlockEngine extends Block implements EntityBlock {
 
-    public static final DirectionProperty FACING =
+    public static final EnumProperty<Direction> FACING =
             BlockStateProperties.FACING;
 
     private final BiFunction<BlockPos, BlockState, ? extends TileEngine>
@@ -145,41 +145,16 @@ public class BlockEngine extends Block implements EntityBlock {
         return InteractionResult.SUCCESS;
     }
     @Override
-    protected void onRemove(
+    protected void affectNeighborsAfterRemoval(
             BlockState state,
-            Level level,
+            ServerLevel level,
             BlockPos pos,
-            BlockState newState,
             boolean movedByPiston
     ) {
-        if (!state.is(newState.getBlock()) && !level.isClientSide()) {
-            if (level.getBlockEntity(pos) instanceof TileEngineSteamHobby engine) {
-                var inventory = engine.getInventory();
-
-                for (int slot = 0; slot < inventory.getSlots(); slot++) {
-                    ItemStack stack = inventory.getStackInSlot(slot).copy();
-
-                    if (!stack.isEmpty()) {
-                        inventory.setStackInSlot(slot, ItemStack.EMPTY);
-                        Containers.dropItemStack(
-                                level,
-                                pos.getX(),
-                                pos.getY(),
-                                pos.getZ(),
-                                stack
-                        );
-                    }
-                }
-
-                level.updateNeighbourForOutputSignal(pos, this);
-            }
-        }
-
-        super.onRemove(state, level, pos, newState, movedByPiston);
+        Containers.updateNeighboursAfterDestroy(state, level, pos);
     }
 
     @Override
-    @OnlyIn(Dist.CLIENT)
     public void animateTick(BlockState state, Level level,
                             BlockPos pos, RandomSource random) {
         if (!(level.getBlockEntity(pos) instanceof TileEngineSteam engine)) {

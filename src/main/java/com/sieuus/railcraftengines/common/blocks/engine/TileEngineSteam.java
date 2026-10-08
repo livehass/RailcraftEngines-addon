@@ -6,33 +6,33 @@
  * https://github.com/Railcraft/Railcraft
  *
  * Legacy source branch: mc-1.7.10
- * Adapted for Minecraft 1.21.1 / NeoForge by sieuus.
+ * Adapted for Minecraft 26.1.2 / NeoForge by sieuus.
  */
 
 package com.sieuus.railcraftengines.common.blocks.engine;
 
 import com.sieuus.railcraftengines.common.util.steam.SteamConstants;
 import com.sieuus.railcraftengines.integration.railcraft.RailcraftFluids;
+import mods.railcraft.sounds.RailcraftSoundEvents;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidType;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
-import mods.railcraft.sounds.RailcraftSoundEvents;
-import net.minecraft.sounds.SoundSource;
-
-
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.fluid.FluidStacksResourceHandler;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
 
 public abstract class TileEngineSteam extends TileEngine {
 
     public static final int DEFAULT_STEAM_TANK_CAPACITY =
             8 * FluidType.BUCKET_VOLUME;
 
-    protected final FluidTank steamTank;
+    protected final FluidStacksResourceHandler steamTank;
+    private final int steamTankCapacity;
 
     private int steamUsed;
 
@@ -57,15 +57,48 @@ public abstract class TileEngineSteam extends TileEngine {
     ) {
         super(type, pos, state);
 
-        this.steamTank = new FluidTank(
-                steamTankCapacity,
-                RailcraftFluids::isSteam
-        ) {
+        this.steamTankCapacity = steamTankCapacity;
+        this.steamTank = new FluidStacksResourceHandler(1, steamTankCapacity) {
             @Override
-            protected void onContentsChanged() {
+            public boolean isValid(int index, FluidResource resource) {
+                return index == 0 && !resource.isEmpty()
+                        && isSteamValidForTank(resource.toStack(1));
+            }
+
+            @Override
+            protected void onContentsChanged(int index, FluidStack previousContents) {
                 TileEngineSteam.this.setChanged();
             }
         };
+    }
+
+    protected boolean isSteamValidForTank(FluidStack stack) {
+        return RailcraftFluids.isSteam(stack);
+    }
+
+    public FluidStack getSteamStack() {
+        return steamTank.getResource(0).toStack(steamTank.getAmountAsInt(0));
+    }
+
+    public int getSteamAmount() {
+        return steamTank.getAmountAsInt(0);
+    }
+
+    public int getSteamCapacity() {
+        return steamTankCapacity;
+    }
+
+    protected int consumeSteam(int amount) {
+        if (amount <= 0 || getSteamAmount() == 0) {
+            return 0;
+        }
+
+        try (Transaction transaction = Transaction.openRoot()) {
+            int extracted = steamTank.extract(
+                    0, steamTank.getResource(0), amount, transaction);
+            transaction.commit();
+            return extracted;
+        }
     }
 
     @Override
@@ -74,36 +107,20 @@ public abstract class TileEngineSteam extends TileEngine {
 
         if (getEnergyStage() != EnergyStage.OVERHEAT) {
             if (isPowered()) {
-                FluidStack steam = steamTank.getFluid();
+                FluidStack steam = getSteamStack();
 
                 int minimumSteam =
-                        steamTank.getCapacity() / 2
+                        getSteamCapacity() / 2
                                 - SteamConstants.STEAM_PER_UNIT_WATER;
 
                 if (!steam.isEmpty()
                         && steam.getAmount() >= minimumSteam) {
 
-                    FluidStack drained =
-                            steamTank.drain(
-                                    steamUsedPerTick() - 1,
-                                    IFluidHandler.FluidAction.EXECUTE
-                            );
-
-                    if (!drained.isEmpty()) {
-                        steamUsed += drained.getAmount();
-                    }
+                    steamUsed += consumeSteam(steamUsedPerTick() - 1);
                 }
             }
 
-            FluidStack passiveSteam =
-                    steamTank.drain(
-                            1,
-                            IFluidHandler.FluidAction.EXECUTE
-                    );
-
-            if (!passiveSteam.isEmpty()) {
-                steamUsed += passiveSteam.getAmount();
-            }
+            steamUsed += consumeSteam(1);
 
             if (isPowered()) {
                 if (steamUsed >= steamUsedPerTick()) {
@@ -131,13 +148,10 @@ public abstract class TileEngineSteam extends TileEngine {
     }
 
     protected void ventSteam() {
-        steamTank.drain(
-                5,
-                IFluidHandler.FluidAction.EXECUTE
-        );
+        consumeSteam(5);
     }
 
-    public FluidTank getSteamTank() {
+    public FluidStacksResourceHandler getSteamTank() {
         return steamTank;
     }
 
@@ -154,46 +168,27 @@ public abstract class TileEngineSteam extends TileEngine {
     public abstract int steamUsedPerTick();
 
     @Override
-    public void loadAdditional(
-            CompoundTag tag,
-            HolderLookup.Provider registries
-    ) {
-        super.loadAdditional(tag, registries);
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
 
-        if (tag.contains("SteamTank")) {
-            steamTank.readFromNBT(
-                    registries,
-                    tag.getCompound("SteamTank")
-            );
-        }
-
-        steamUsed = tag.getInt("SteamUsed");
+        // Preserve the existing save format while changing the tank implementation.
+        FluidStack storedSteam = input.childOrEmpty("SteamTank")
+                .read("Fluid", FluidStack.CODEC).orElse(FluidStack.EMPTY);
+        steamTank.set(0, FluidResource.of(storedSteam),
+                Math.min(storedSteam.getAmount(), steamTankCapacity));
+        steamUsed = input.getIntOr("SteamUsed", 0);
     }
 
     @Override
-    public void saveAdditional(
-            CompoundTag tag,
-            HolderLookup.Provider registries
-    ) {
-        super.saveAdditional(tag, registries);
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
 
-        CompoundTag steamTag =
-                new CompoundTag();
-
-        steamTank.writeToNBT(
-                registries,
-                steamTag
-        );
-
-        tag.put(
-                "SteamTank",
-                steamTag
-        );
-
-        tag.putInt(
-                "SteamUsed",
-                steamUsed
-        );
+        ValueOutput tankOutput = output.child("SteamTank");
+        FluidStack storedSteam = getSteamStack();
+        if (!storedSteam.isEmpty()) {
+            tankOutput.store("Fluid", FluidStack.CODEC, storedSteam);
+        }
+        output.putInt("SteamUsed", steamUsed);
     }
 
     @Override
@@ -212,7 +207,7 @@ public abstract class TileEngineSteam extends TileEngine {
         }
 
         float pitch = (float) (
-                basePitch + level.random.nextGaussian() * 0.1);
+                basePitch + level.getRandom().nextGaussian() * 0.1);
 
         level.playLocalSound(
                 worldPosition.getX() + 0.5,

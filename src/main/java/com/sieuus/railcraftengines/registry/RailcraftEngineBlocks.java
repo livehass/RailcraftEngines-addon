@@ -25,7 +25,7 @@ public final class RailcraftEngineBlocks {
                             properties,
                             TileEngineSteamHobby::new
                     ),
-                    BlockBehaviour.Properties.of()
+                    () -> BlockBehaviour.Properties.of()
                             .mapColor(MapColor.METAL)
                             .strength(3.0F, 6.0F)
                             .sound(SoundType.METAL)
@@ -39,7 +39,7 @@ public final class RailcraftEngineBlocks {
                             properties,
                             TileEngineSteamCommercial::new
                     ),
-                    BlockBehaviour.Properties.of()
+                    () -> BlockBehaviour.Properties.of()
                             .mapColor(MapColor.METAL)
                             .strength(3.0F, 6.0F)
                             .sound(SoundType.METAL)
@@ -54,7 +54,7 @@ public final class RailcraftEngineBlocks {
                             properties,
                             TileEngineSteamIndustrial::new
                     ),
-                    BlockBehaviour.Properties.of()
+                    () -> BlockBehaviour.Properties.of()
                             .mapColor(MapColor.METAL)
                             .strength(3.0F, 6.0F)
                             .sound(SoundType.METAL)

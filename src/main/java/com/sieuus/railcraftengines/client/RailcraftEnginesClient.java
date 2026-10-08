@@ -16,13 +16,8 @@ import com.sieuus.railcraftengines.registry.RailcraftEngineMenus;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import com.sieuus.railcraftengines.client.screen.CommercialEngineScreen;
 import com.sieuus.railcraftengines.client.render.SteamEngineItemRenderer;
-import com.sieuus.railcraftengines.common.blocks.engine.BlockEngine;
-import com.sieuus.railcraftengines.registry.RailcraftEngineItems;
-import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
-import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
-import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
+import net.minecraft.resources.Identifier;
+import net.neoforged.neoforge.client.event.RegisterSpecialModelRendererEvent;
 
 @EventBusSubscriber(
         modid = RailcraftEngines.MODID,
@@ -91,30 +86,16 @@ public final class RailcraftEnginesClient {
     }
 
     @SubscribeEvent
-    public static void registerClientExtensions(
-            RegisterClientExtensionsEvent event
+    public static void registerSpecialModelRenderers(
+            RegisterSpecialModelRendererEvent event
     ) {
-        IClientItemExtensions extensions = new IClientItemExtensions() {
-            private SteamEngineItemRenderer renderer;
-
-            @Override
-            public BlockEntityWithoutLevelRenderer getCustomRenderer() {
-                if (renderer == null) {
-                    renderer = new SteamEngineItemRenderer();
-                }
-
-                return renderer;
-            }
-        };
-
-        Item[] engineItems = RailcraftEngineItems.ITEMS.getEntries()
-                .stream()
-                .map(holder -> holder.get())
-                .filter(item -> item instanceof BlockItem blockItem
-                        && blockItem.getBlock() instanceof BlockEngine)
-                .toArray(Item[]::new);
-
-        event.registerItem(extensions, engineItems);
+        event.register(
+                Identifier.fromNamespaceAndPath(
+                        RailcraftEngines.MODID,
+                        "steam_engine"
+                ),
+                SteamEngineItemRenderer.Unbaked.CODEC
+        );
     }
 
 

@@ -5,7 +5,7 @@
  * Original project:
  * https://github.com/Railcraft/Railcraft
  *
- * Adapted for Minecraft 1.21.1 / NeoForge by sieuus.
+ * Adapted for Minecraft 26.1.2 / NeoForge by sieuus.
  */
 
 package com.sieuus.railcraftengines.common.blocks.engine;
@@ -17,8 +17,6 @@ import com.sieuus.railcraftengines.common.util.steam.SolidFuelProvider;
 import com.sieuus.railcraftengines.common.util.steam.SteamConstants;
 import com.sieuus.railcraftengines.registry.RailcraftEngineBlockEntities;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.MenuProvider;
@@ -28,26 +26,27 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.fluids.FluidActionResult;
-import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidType;
-import net.neoforged.neoforge.fluids.FluidUtil;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.fluids.capability.IFluidHandlerItem;
-import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
-import net.neoforged.neoforge.items.ItemStackHandler;
-import net.neoforged.neoforge.items.IItemHandler;
-import net.neoforged.neoforge.items.wrapper.RangedWrapper;
-
-import javax.annotation.Nullable;
+import net.neoforged.neoforge.transfer.DelegatingResourceHandler;
+import net.neoforged.neoforge.transfer.ResourceHandler;
+import net.neoforged.neoforge.transfer.ResourceHandlerUtil;
+import net.neoforged.neoforge.transfer.access.ItemAccess;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.fluid.FluidStacksResourceHandler;
+import net.neoforged.neoforge.transfer.item.ItemResource;
+import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
+import net.neoforged.neoforge.transfer.transaction.TransactionContext;
+import net.minecraft.world.Containers;
+import net.minecraft.world.ItemStackWithSlot;
+import java.util.Objects;
 
 public final class TileEngineSteamHobby
         extends TileEngineSteam
         implements MenuProvider {
-
-    private static final int TANK_STEAM = 0;
-    private static final int TANK_WATER = 1;
 
     public static final int SLOT_FUEL = 0;
     public static final int SLOT_LIQUID_INPUT = 1;
@@ -65,35 +64,39 @@ public final class TileEngineSteamHobby
     private static final long MAX_ENERGY = 100_000L;
     private static final long MAX_ENERGY_OUTPUT = OUTPUT_FE * 8L;
 
-    private final IFluidHandler fluidInputHandler;
+    private final ResourceHandler<FluidResource> fluidInputHandler;
 
-    private final ItemStackHandler inventory = new ItemStackHandler(3) {
-
+    private final ItemStacksResourceHandler inventory = new ItemStacksResourceHandler(3) {
         @Override
-        public boolean isItemValid(int slot, ItemStack stack) {
+        public boolean isValid(int slot, ItemResource resource) {
+            ItemStack stack = resource.toStack();
             return switch (slot) {
                 case SLOT_FUEL -> isValidFuel(stack);
                 case SLOT_LIQUID_INPUT -> containsWater(stack);
-                case SLOT_LIQUID_OUTPUT -> false;
                 default -> false;
             };
         }
 
         @Override
-        protected void onContentsChanged(int slot) {
+        protected void onContentsChanged(int slot, ItemStack previousContents) {
             TileEngineSteamHobby.this.setChanged();
         }
     };
 
-    private final IItemHandler automationInventory =
-            new RangedWrapper(inventory, 0, inventory.getSlots()) {
+    private final ResourceHandler<ItemResource> automationInventory =
+            new DelegatingResourceHandler<ItemResource>(inventory) {
                 @Override
-                public ItemStack extractItem(int slot, int amount, boolean simulate) {
-                    if (slot != SLOT_LIQUID_OUTPUT) {
-                        return ItemStack.EMPTY;
-                    }
+                public int extract(int slot, ItemResource resource, int amount,
+                                   TransactionContext transaction) {
+                    Objects.checkIndex(slot, size());
+                    return slot == SLOT_LIQUID_OUTPUT
+                            ? inventory.extract(slot, resource, amount, transaction) : 0;
+                }
 
-                    return super.extractItem(slot, amount, simulate);
+                @Override
+                public int extract(ItemResource resource, int amount,
+                                   TransactionContext transaction) {
+                    return extract(SLOT_LIQUID_OUTPUT, resource, amount, transaction);
                 }
             };
 
@@ -115,7 +118,8 @@ public final class TileEngineSteamHobby
                 SLOT_FUEL,
                 SLOT_LIQUID_OUTPUT,
                 () -> isPowered()
-                        && getEnergyStage() != EnergyStage.OVERHEAT
+                        && getEnergyStage() != EnergyStage.OVERHEAT,
+                () -> level
         );
 
         this.boiler = new BoilerLogic(
@@ -132,200 +136,104 @@ public final class TileEngineSteamHobby
                 this::setChanged
         );
 
-        this.fluidInputHandler = new IFluidHandler() {
-
+        // Only water is exposed to pipes. Steam remains internal to this engine.
+        this.fluidInputHandler = new DelegatingResourceHandler<FluidResource>(
+                () -> boiler.getWaterTank()) {
             @Override
-            public int getTanks() {
-                return 2;
+            public boolean isValid(int index, FluidResource resource) {
+                Objects.checkIndex(index, size());
+                return isWater(resource) && super.isValid(index, resource);
             }
 
             @Override
-            public FluidStack getFluidInTank(int tank) {
-                return switch (tank) {
-                    case TANK_STEAM ->
-                            getSteamTank().getFluidInTank(0);
-
-                    case TANK_WATER ->
-                            boiler.getWaterTank().getFluidInTank(0);
-
-                    default ->
-                            FluidStack.EMPTY;
-                };
+            public int insert(int index, FluidResource resource, int amount,
+                              TransactionContext transaction) {
+                Objects.checkIndex(index, size());
+                return isWater(resource)
+                        ? super.insert(index, resource, amount, transaction) : 0;
             }
 
             @Override
-            public int getTankCapacity(int tank) {
-                return switch (tank) {
-                    case TANK_STEAM ->
-                            getSteamTank().getTankCapacity(0);
-
-                    case TANK_WATER ->
-                            boiler.getWaterTank().getTankCapacity(0);
-
-                    default ->
-                            0;
-                };
+            public int insert(FluidResource resource, int amount,
+                              TransactionContext transaction) {
+                return insert(0, resource, amount, transaction);
             }
 
             @Override
-            public boolean isFluidValid(
-                    int tank,
-                    FluidStack stack
-            ) {
-                if (stack.isEmpty()) {
-                    return false;
-                }
-
-                return switch (tank) {
-                    case TANK_STEAM ->
-                            getSteamTank().isFluidValid(stack);
-
-                    case TANK_WATER ->
-                            stack.is(FluidTags.WATER);
-
-                    default ->
-                            false;
-                };
-            }
-
-            @Override
-            public int fill(
-                    FluidStack resource,
-                    FluidAction action
-            ) {
-                if (resource.isEmpty()) {
-                    return 0;
-                }
-
-                if (isPowered()
-                        && getSteamTank().isFluidValid(resource)) {
-                    return getSteamTank().fill(
-                            resource,
-                            action
-                    );
-                }
-
-                if (resource.is(FluidTags.WATER)) {
-                    return boiler.getWaterTank().fill(
-                            resource,
-                            action
-                    );
-                }
-
+            public int extract(int index, FluidResource resource, int amount,
+                               TransactionContext transaction) {
+                Objects.checkIndex(index, size());
                 return 0;
             }
 
             @Override
-            public FluidStack drain(
-                    FluidStack resource,
-                    FluidAction action
-            ) {
-                return FluidStack.EMPTY;
-            }
-
-            @Override
-            public FluidStack drain(
-                    int maxDrain,
-                    FluidAction action
-            ) {
-                return FluidStack.EMPTY;
+            public int extract(FluidResource resource, int amount,
+                               TransactionContext transaction) {
+                return 0;
             }
         };
     }
 
-    private void processWaterContainer() {
-        ItemStack input = inventory.getStackInSlot(
-                SLOT_LIQUID_INPUT
-        );
+    public ItemStack getInventoryStack(int slot) {
+        return inventory.getResource(slot).toStack(inventory.getAmountAsInt(slot));
+    }
 
+    private static boolean isWater(FluidResource resource) {
+        return !resource.isEmpty() && resource.toStack(1).is(FluidTags.WATER);
+    }
+
+    private void processWaterContainer() {
+        ItemStack input = getInventoryStack(SLOT_LIQUID_INPUT);
         if (input.isEmpty()) {
             return;
         }
 
-        ItemStack singleContainer = input.copyWithCount(1);
-
-        FluidActionResult simulated = FluidUtil.tryEmptyContainer(
-                singleContainer,
-                boiler.getWaterTank(),
-                FluidType.BUCKET_VOLUME,
-                null,
-                false
-        );
-
-        if (!simulated.isSuccess()) {
+        // Isolate one container so its capability can replace it with the result.
+        ItemStacksResourceHandler container = new ItemStacksResourceHandler(1);
+        container.set(0, ItemResource.of(input), 1);
+        ItemAccess access = ItemAccess.forHandlerIndexStrict(container, 0);
+        ResourceHandler<FluidResource> fluidHandler = access.getCapability(Capabilities.Fluid.ITEM);
+        if (fluidHandler == null) {
             return;
         }
 
-        ItemStack result = simulated.getResult();
+        ItemStack result;
+        try (Transaction transaction = Transaction.openRoot()) {
+            int transferred = ResourceHandlerUtil.move(
+                    fluidHandler, fluidInputHandler, TileEngineSteamHobby::isWater,
+                    FluidType.BUCKET_VOLUME, transaction);
+            if (transferred <= 0) {
+                return;
+            }
 
-        if (!result.isEmpty()
-                && !canStoreInLiquidOutput(result)) {
-            return;
+            result = container.getResource(0).toStack(container.getAmountAsInt(0));
+            if (!result.isEmpty() && !canStoreInLiquidOutput(result)) {
+                return;
+            }
+
+            if (inventory.extract(SLOT_LIQUID_INPUT, ItemResource.of(input),
+                    1, transaction) != 1) {
+                return;
+            }
+            transaction.commit();
         }
 
-        FluidActionResult executed = FluidUtil.tryEmptyContainer(
-                singleContainer,
-                boiler.getWaterTank(),
-                FluidType.BUCKET_VOLUME,
-                null,
-                true
-        );
-
-        if (!executed.isSuccess()) {
-            return;
+        // Internal output placement bypasses the external insertion restriction.
+        if (!result.isEmpty()) {
+            inventory.set(SLOT_LIQUID_OUTPUT, ItemResource.of(result),
+                    inventory.getAmountAsInt(SLOT_LIQUID_OUTPUT) + result.getCount());
         }
-
-        inventory.extractItem(
-                SLOT_LIQUID_INPUT,
-                1,
-                false
-        );
-
-        ItemStack emptyContainer = executed.getResult();
-
-        if (!emptyContainer.isEmpty()) {
-            storeInLiquidOutput(emptyContainer);
-        }
-
         setChanged();
     }
 
     private boolean canStoreInLiquidOutput(ItemStack stack) {
-        ItemStack current = inventory.getStackInSlot(
-                SLOT_LIQUID_OUTPUT
-        );
-
-        if (current.isEmpty()) {
-            return true;
+        ItemStack current = getInventoryStack(SLOT_LIQUID_OUTPUT);
+        if (!current.isEmpty() && !ItemStack.isSameItemSameComponents(current, stack)) {
+            return false;
         }
-
-        return ItemStack.isSameItemSameComponents(
-                current,
-                stack
-        ) && current.getCount() + stack.getCount()
-                <= current.getMaxStackSize();
-    }
-
-    private void storeInLiquidOutput(ItemStack stack) {
-        ItemStack current = inventory.getStackInSlot(
-                SLOT_LIQUID_OUTPUT
-        );
-
-        if (current.isEmpty()) {
-            inventory.setStackInSlot(
-                    SLOT_LIQUID_OUTPUT,
-                    stack.copy()
-            );
-            return;
-        }
-
-        ItemStack merged = current.copy();
-        merged.grow(stack.getCount());
-
-        inventory.setStackInSlot(
-                SLOT_LIQUID_OUTPUT,
-                merged
-        );
+        long capacity = Math.min(stack.getMaxStackSize(),
+                inventory.getCapacityAsLong(SLOT_LIQUID_OUTPUT, ItemResource.of(stack)));
+        return (long) current.getCount() + stack.getCount() <= capacity;
     }
 
     @Override
@@ -361,56 +269,66 @@ public final class TileEngineSteamHobby
         boiler.update();
     }
 
-    public ItemStackHandler getInventory() {
-
+    public ItemStacksResourceHandler getInventory() {
         return inventory;
     }
 
-    public IItemHandler getAutomationInventory() {
+    public ResourceHandler<ItemResource> getAutomationInventory() {
         return automationInventory;
     }
 
-    public IFluidHandler getFluidInputHandler() {
+    public ResourceHandler<FluidResource> getFluidInputHandler() {
         return fluidInputHandler;
     }
 
     public ItemStack getFuelStack() {
-        return inventory.getStackInSlot(SLOT_FUEL);
+        return getInventoryStack(SLOT_FUEL);
     }
 
-    public static boolean isValidFuel(ItemStack stack) {
-        return !stack.isEmpty()
-                && stack.getBurnTime(RecipeType.SMELTING) > 0;
+    public boolean isValidFuel(ItemStack stack) {
+        return level != null && !stack.isEmpty()
+                && stack.getBurnTime(RecipeType.SMELTING, level.fuelValues()) > 0;
     }
 
     private static boolean containsWater(ItemStack stack) {
         if (stack.isEmpty()) {
             return false;
         }
-
-        IFluidHandlerItem fluidHandler =
-                stack.getCapability(Capabilities.FluidHandler.ITEM);
-
-        if (fluidHandler == null) {
+        ItemStacksResourceHandler container = new ItemStacksResourceHandler(1);
+        container.set(0, ItemResource.of(stack), 1);
+        ResourceHandler<FluidResource> handler = ItemAccess.forHandlerIndexStrict(container, 0)
+                .getCapability(Capabilities.Fluid.ITEM);
+        if (handler == null) {
             return false;
         }
-
-        for (int tank = 0; tank < fluidHandler.getTanks(); tank++) {
-            FluidStack fluid = fluidHandler.getFluidInTank(tank);
-
-            if (!fluid.isEmpty() && fluid.is(FluidTags.WATER)) {
+        for (int tank = 0; tank < handler.size(); tank++) {
+            if (handler.getAmountAsLong(tank) > 0 && isWater(handler.getResource(tank))) {
                 return true;
             }
         }
-
         return false;
+    }
+
+    @Override
+    public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+        super.preRemoveSideEffects(pos, state);
+        if (level == null || level.isClientSide()) {
+            return;
+        }
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            ItemStack stack = getInventoryStack(slot);
+            if (!stack.isEmpty()) {
+                inventory.set(slot, ItemResource.EMPTY, 0);
+                Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack);
+            }
+        }
     }
 
     public BoilerLogic getBoiler() {
         return boiler;
     }
 
-    public FluidTank getWaterTank() {
+    public FluidStacksResourceHandler getWaterTank() {
         return boiler.getWaterTank();
     }
 
@@ -419,35 +337,37 @@ public final class TileEngineSteamHobby
     }
 
     @Override
-    public void loadAdditional(
-            CompoundTag tag,
-            HolderLookup.Provider registries
-    ) {
-        super.loadAdditional(tag, registries);
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
 
-        if (tag.contains("Inventory")) {
-            inventory.deserializeNBT(
-                    registries,
-                    tag.getCompound("Inventory")
-            );
+        // Keep the existing slot-based save format.
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            inventory.set(slot, ItemResource.EMPTY, 0);
         }
-
-        boiler.load(tag, registries);
+        input.childOrEmpty("Inventory").listOrEmpty("Items", ItemStackWithSlot.CODEC)
+                .forEach(entry -> {
+                    if (entry.isValidInContainer(inventory.size())) {
+                        inventory.set(entry.slot(), ItemResource.of(entry.stack()),
+                                entry.stack().getCount());
+                    }
+                });
+        boiler.load(input);
     }
 
     @Override
-    public void saveAdditional(
-            CompoundTag tag,
-            HolderLookup.Provider registries
-    ) {
-        super.saveAdditional(tag, registries);
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
 
-        tag.put(
-                "Inventory",
-                inventory.serializeNBT(registries)
-        );
-
-        boiler.save(tag, registries);
+        ValueOutput inventoryOutput = output.child("Inventory");
+        var items = inventoryOutput.list("Items", ItemStackWithSlot.CODEC);
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            ItemStack stack = getInventoryStack(slot);
+            if (!stack.isEmpty()) {
+                items.add(new ItemStackWithSlot(slot, stack));
+            }
+        }
+        inventoryOutput.putInt("Size", inventory.size());
+        boiler.save(output);
     }
 
     @Override
@@ -458,7 +378,7 @@ public final class TileEngineSteamHobby
     }
 
     @Override
-    public @Nullable AbstractContainerMenu createMenu(
+    public AbstractContainerMenu createMenu(
             int containerId,
             Inventory playerInventory,
             Player player

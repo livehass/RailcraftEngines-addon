@@ -1,15 +1,15 @@
 package com.sieuus.railcraftengines.integration.railcraft;
 
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 
 public final class RailcraftFluids {
 
-    private static final ResourceLocation STEAM_ID =
-            ResourceLocation.fromNamespaceAndPath("railcraft", "steam");
+    private static final Identifier STEAM_ID =
+            Identifier.fromNamespaceAndPath("railcraft", "steam");
 
     private RailcraftFluids() {
     }
@@ -21,8 +21,11 @@ public final class RailcraftFluids {
     }
 
     public static boolean isSteam(FluidStack stack) {
-        return !stack.isEmpty()
-                && stack.getFluid() == getSteam()
-                && getSteam() != Fluids.EMPTY;
+        if (stack.isEmpty()) {
+            return false;
+        }
+
+        Fluid steam = getSteam();
+        return steam != Fluids.EMPTY && stack.getFluid() == steam;
     }
 }

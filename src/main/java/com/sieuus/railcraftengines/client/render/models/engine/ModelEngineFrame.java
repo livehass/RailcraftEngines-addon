@@ -6,13 +6,11 @@
  * https://github.com/Railcraft/Railcraft
  *
  * Legacy source branch: mc-1.7.10
- * Adapted for Minecraft 1.21.1 / NeoForge by sieuus.
+ * Adapted for Minecraft 26.1.2 / NeoForge by sieuus.
  */
 
 package com.sieuus.railcraftengines.client.render.models.engine;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.sieuus.railcraftengines.RailcraftEngines;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.ModelPart;
@@ -21,13 +19,13 @@ import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public final class ModelEngineFrame {
 
     public static final ModelLayerLocation LAYER =
             new ModelLayerLocation(
-                    ResourceLocation.fromNamespaceAndPath(
+                    Identifier.fromNamespaceAndPath(
                             RailcraftEngines.MODID,
                             "steam_engine_frame"
                     ),
@@ -88,17 +86,7 @@ public final class ModelEngineFrame {
         );
     }
 
-    public void render(
-            PoseStack poseStack,
-            VertexConsumer consumer,
-            int packedLight,
-            int packedOverlay
-    ) {
-        frame.render(
-                poseStack,
-                consumer,
-                packedLight,
-                packedOverlay
-        );
+    public ModelPart getPart() {
+        return frame;
     }
 }

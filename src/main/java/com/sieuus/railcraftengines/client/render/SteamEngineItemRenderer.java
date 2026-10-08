@@ -1,76 +1,172 @@
 package com.sieuus.railcraftengines.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.sieuus.railcraftengines.common.blocks.engine.BlockEngine;
-import com.sieuus.railcraftengines.common.blocks.engine.TileEngineSteam;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemDisplayContext;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import com.sieuus.railcraftengines.RailcraftEngines;
+import com.sieuus.railcraftengines.client.render.models.engine.ModelEngineBase;
+import com.sieuus.railcraftengines.client.render.models.engine.ModelEngineFrame;
+import com.sieuus.railcraftengines.client.render.models.engine.ModelEnginePiston;
+import com.sieuus.railcraftengines.client.render.models.engine.ModelEngineTrunk;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.special.SpecialModelRenderer;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Locale;
+import java.util.function.Consumer;
 
-public final class SteamEngineItemRenderer
-        extends BlockEntityWithoutLevelRenderer {
+/** Renders the three steam-engine block items using the 26.1 special-model API. */
+public final class SteamEngineItemRenderer implements SpecialModelRenderer<Void> {
 
-    private final Map<Block, TileEngineSteam> previews = new HashMap<>();
+    private static final Codec<EngineVariant> ENGINE_VARIANT_CODEC = Codec.STRING.xmap(
+            name -> EngineVariant.valueOf(name.toUpperCase(Locale.ROOT)),
+            variant -> variant.name().toLowerCase(Locale.ROOT)
+    );
 
-    public SteamEngineItemRenderer() {
-        super(
-                Minecraft.getInstance().getBlockEntityRenderDispatcher(),
-                Minecraft.getInstance().getEntityModels()
+    private static final Identifier HOBBYIST_TEXTURE = texture("steam_hobby.png");
+    private static final Identifier COMMERCIAL_TEXTURE = texture("steam_low.png");
+    private static final Identifier INDUSTRIAL_TEXTURE = texture("steam_high.png");
+
+    private static Identifier texture(String file) {
+        return Identifier.fromNamespaceAndPath(
+                RailcraftEngines.MODID,
+                "textures/block/engine/" + file
         );
     }
 
+    private final ModelPart base;
+    private final ModelPart frame;
+    private final ModelPart piston;
+    private final ModelPart trunk;
+    private final Identifier texture;
+
+    private SteamEngineItemRenderer(SpecialModelRenderer.BakingContext baker, EngineVariant variant) {
+        this.base = baker.entityModelSet().bakeLayer(ModelEngineBase.LAYER).getChild("base");
+        this.frame = baker.entityModelSet().bakeLayer(ModelEngineFrame.LAYER).getChild("frame");
+        this.piston = baker.entityModelSet().bakeLayer(ModelEnginePiston.LAYER).getChild("piston");
+        this.trunk = baker.entityModelSet().bakeLayer(ModelEngineTrunk.LAYER)
+                .getChild("blue");
+        this.texture = switch (variant) {
+            case HOBBYIST -> HOBBYIST_TEXTURE;
+            case COMMERCIAL -> COMMERCIAL_TEXTURE;
+            case INDUSTRIAL -> INDUSTRIAL_TEXTURE;
+        };
+    }
+
     @Override
-    public void renderByItem(
-            ItemStack stack,
-            ItemDisplayContext displayContext,
+    public Void extractArgument(ItemStack stack) {
+        return null;
+    }
+
+    @Override
+    public void getExtents(Consumer<Vector3fc> output) {
+        for (int x = 0; x <= 1; x++) {
+            for (int y = 0; y <= 1; y++) {
+                for (int z = 0; z <= 1; z++) {
+                    output.accept(new Vector3f(x, y, z));
+                }
+            }
+        }
+    }
+
+    @Override
+    public void submit(
+            Void argument,
             PoseStack poseStack,
-            MultiBufferSource bufferSource,
-            int packedLight,
-            int packedOverlay
+            SubmitNodeCollector collector,
+            int lightCoords,
+            int overlayCoords,
+            boolean hasFoil,
+            int outlineColor
     ) {
-        if (!(stack.getItem() instanceof BlockItem blockItem)) return;
-        if (!(blockItem.getBlock() instanceof BlockEngine block)) return;
+        RenderType renderType = RenderTypes.entityCutoutCull(texture);
 
-        TileEngineSteam preview = previews.computeIfAbsent(block, key -> {
-            var blockEntity = block.newBlockEntity(
-                    BlockPos.ZERO,
-                    block.defaultBlockState()
-            );
-
-            return blockEntity instanceof TileEngineSteam engine
-                    ? engine
-                    : null;
-        });
-
-        if (preview == null) return;
-
-        // Resolve the current renderer so resource reloads remain supported.
-        var renderer = Minecraft.getInstance()
-                .getBlockEntityRenderDispatcher()
-                .getRenderer(preview);
-
-        if (renderer == null) return;
-
+        // Keep the same block-centered coordinates and resting piston position as
+        // the previous BlockEntityWithoutLevelRenderer implementation.
         poseStack.pushPose();
         try {
-            renderer.render(
-                    preview,
-                    0.0F,
-                    poseStack,
-                    bufferSource,
-                    packedLight,
-                    packedOverlay
-            );
+            poseStack.translate(0.5D, 0.5D, 0.5D);
+            poseStack.translate(-0.5D, -0.5D, -0.5D);
+
+            submitPart(trunk, poseStack, collector, renderType,
+                    lightCoords, overlayCoords, hasFoil, outlineColor);
+            submitPart(base, poseStack, collector, renderType,
+                    lightCoords, overlayCoords, hasFoil, outlineColor);
+            submitPart(frame, poseStack, collector, renderType,
+                    lightCoords, overlayCoords, hasFoil, outlineColor);
+
+            // The original renderer submits two piston segments at rest.
+            poseStack.pushPose();
+            try {
+                poseStack.translate(0.0D, -0.01D, 0.0D);
+                for (int segment = 0; segment < 2; segment++) {
+                    submitPart(piston, poseStack, collector, renderType,
+                            lightCoords, overlayCoords, hasFoil, outlineColor);
+                    poseStack.translate(0.0D, 2.0D / 16.0D, 0.0D);
+                }
+            } finally {
+                poseStack.popPose();
+            }
         } finally {
             poseStack.popPose();
+        }
+    }
+
+    public static void submitPart(
+            ModelPart part,
+            PoseStack poseStack,
+            SubmitNodeCollector collector,
+            RenderType renderType,
+            int lightCoords,
+            int overlayCoords,
+            boolean hasFoil,
+            int outlineColor
+    ) {
+        collector.submitModelPart(
+                part,
+                poseStack,
+                renderType,
+                lightCoords,
+                overlayCoords,
+                null,
+                false,
+                hasFoil,
+                -1,
+                null,
+                outlineColor
+        );
+    }
+
+    public enum EngineVariant {
+        HOBBYIST,
+        COMMERCIAL,
+        INDUSTRIAL
+    }
+
+    public record Unbaked(EngineVariant variant)
+            implements SpecialModelRenderer.Unbaked<Void> {
+
+        public static final MapCodec<Unbaked> CODEC = RecordCodecBuilder.mapCodec(instance ->
+                instance.group(
+                        ENGINE_VARIANT_CODEC.fieldOf("engine").forGetter(Unbaked::variant)
+                ).apply(instance, Unbaked::new)
+        );
+
+        @Override
+        public MapCodec<Unbaked> type() {
+            return CODEC;
+        }
+
+        @Override
+        public SpecialModelRenderer<Void> bake(SpecialModelRenderer.BakingContext baker) {
+            return new SteamEngineItemRenderer(baker, variant);
         }
     }
 }

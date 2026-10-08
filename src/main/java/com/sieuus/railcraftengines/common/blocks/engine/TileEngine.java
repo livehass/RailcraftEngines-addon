@@ -5,7 +5,7 @@
  * Original project:
  * https://github.com/Railcraft/Railcraft
  *
- * Adapted for Minecraft 1.21.1 / NeoForge by sieuus.
+ * Adapted for Minecraft 26.1.2 / NeoForge by sieuus.
  * See the project documentation for license and attribution details.
  */
 
@@ -21,11 +21,18 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.energy.IEnergyStorage;
+import net.neoforged.neoforge.transfer.TransferPreconditions;
+import net.neoforged.neoforge.transfer.energy.EnergyHandler;
+import net.neoforged.neoforge.transfer.transaction.SnapshotJournal;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
+import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+
 
 public abstract class TileEngine extends BlockEntity {
 
@@ -289,7 +296,7 @@ public abstract class TileEngine extends BlockEntity {
         setEnergyStage(computeEnergyStage());
     }
 
-    private IEnergyStorage getEnergyReceiver() {
+    private EnergyHandler getEnergyReceiver() {
         if (level == null) {
             return null;
         }
@@ -300,63 +307,46 @@ public abstract class TileEngine extends BlockEntity {
                 worldPosition.relative(direction);
 
         return level.getCapability(
-                Capabilities.EnergyStorage.BLOCK,
+                Capabilities.Energy.BLOCK,
                 targetPos,
                 direction.getOpposite()
         );
     }
 
     private boolean canOutputEnergy() {
-        IEnergyStorage receiver = getEnergyReceiver();
+        EnergyHandler receiver = getEnergyReceiver();
+        if (receiver == null) {
+            return false;
+        }
 
-        return receiver != null
-                && receiver.canReceive();
+        // Closing without committing rolls back this acceptance check.
+        try (Transaction transaction = Transaction.openRoot()) {
+            return receiver.insert(1, transaction) > 0;
+        }
     }
 
     private void pushEnergyToFacing() {
-        IEnergyStorage receiver = getEnergyReceiver();
-
-        if (receiver == null
-                || !receiver.canReceive()) {
+        EnergyHandler receiver = getEnergyReceiver();
+        if (receiver == null) {
             return;
         }
 
-        long available = Math.min(
-                getEnergyStored(),
-                getMaxEnergyOutput()
-        );
-
-        if (available <= 0) {
+        int requested = (int) Math.min(Integer.MAX_VALUE,
+                Math.min(getEnergyStored(), getMaxEnergyOutput()));
+        if (requested <= 0) {
             return;
         }
 
-        int requested = (int) Math.min(
-                Integer.MAX_VALUE,
-                available
-        );
+        // The receiver and the engine balance participate in the same transaction.
+        try (Transaction transaction = Transaction.openRoot()) {
+            int inserted = receiver.insert(requested, transaction);
+            if (inserted <= 0) {
+                return;
+            }
 
-        int accepted = receiver.receiveEnergy(
-                requested,
-                true
-        );
-
-        if (accepted <= 0) {
-            return;
-        }
-
-        long extracted = extractEnergy(accepted);
-
-        if (extracted <= 0) {
-            return;
-        }
-
-        int inserted = receiver.receiveEnergy(
-                (int) extracted,
-                false
-        );
-
-        if (inserted < extracted) {
-            addEnergy(extracted - inserted);
+            energyJournal.updateSnapshots(transaction);
+            energyStored -= inserted;
+            transaction.commit();
         }
     }
 
@@ -427,57 +417,55 @@ public abstract class TileEngine extends BlockEntity {
         return tag;
     }
 
-    private void readClientSyncTag(CompoundTag tag) {
-        if (tag.contains("Active")) {
-            active = tag.getBoolean("Active");
-        }
-
-        if (tag.contains("Powered")) {
-            powered = tag.getBoolean("Powered");
-        }
-
-        if (tag.contains("EnergyStage")) {
-            energyStage = EnergyStage.fromOrdinal(
-                    tag.getInt("EnergyStage")
-            );
-        }
+    private void readClientSyncTag(ValueInput input) {
+        active = input.getBooleanOr("Active", false);
+        powered = input.getBooleanOr("Powered", false);
+        energyStage = EnergyStage.fromOrdinal(input.getIntOr("EnergyStage", 0));
     }
-    private final IEnergyStorage energyConnection = new IEnergyStorage() {
+    private final SnapshotJournal<Long> energyJournal = new SnapshotJournal<>() {
         @Override
-        public int receiveEnergy(int maxReceive, boolean simulate) {
-            return 0;
+        protected Long createSnapshot() {
+            return energyStored;
         }
 
         @Override
-        public int extractEnergy(int maxExtract, boolean simulate) {
-            // Energy is pushed by the engine during the piston stroke.
-            return 0;
+        protected void revertToSnapshot(Long snapshot) {
+            energyStored = snapshot;
         }
 
         @Override
-        public int getEnergyStored() {
-            return (int) Math.min(
-                    Integer.MAX_VALUE, TileEngine.this.getEnergyStored());
-        }
-
-        @Override
-        public int getMaxEnergyStored() {
-            return (int) Math.min(
-                    Integer.MAX_VALUE, TileEngine.this.getMaxEnergy());
-        }
-
-        @Override
-        public boolean canExtract() {
-            return true;
-        }
-
-        @Override
-        public boolean canReceive() {
-            return false;
+        protected void onRootCommit(Long originalState) {
+            updateEnergyStage();
+            setChanged();
         }
     };
 
-    public IEnergyStorage getEnergyConnection() {
+    // Energy is pushed by the piston; external insertion and extraction stay blocked.
+    private final EnergyHandler energyConnection = new EnergyHandler() {
+        @Override
+        public int insert(int amount, TransactionContext transaction) {
+            TransferPreconditions.checkNonNegative(amount);
+            return 0;
+        }
+
+        @Override
+        public int extract(int amount, TransactionContext transaction) {
+            TransferPreconditions.checkNonNegative(amount);
+            return 0;
+        }
+
+        @Override
+        public long getAmountAsLong() {
+            return TileEngine.this.getEnergyStored();
+        }
+
+        @Override
+        public long getCapacityAsLong() {
+            return TileEngine.this.getMaxEnergy();
+        }
+    };
+
+    public EnergyHandler getEnergyConnection() {
         return energyConnection;
     }
 
@@ -489,11 +477,8 @@ public abstract class TileEngine extends BlockEntity {
     }
 
     @Override
-    public void handleUpdateTag(
-            CompoundTag tag,
-            HolderLookup.Provider registries
-    ) {
-        readClientSyncTag(tag);
+    public void handleUpdateTag(ValueInput input) {
+        readClientSyncTag(input);
     }
 
     @Override
@@ -502,42 +487,29 @@ public abstract class TileEngine extends BlockEntity {
     }
 
     @Override
-    public void onDataPacket(
-            Connection connection,
-            ClientboundBlockEntityDataPacket packet,
-            HolderLookup.Provider registries
-    ) {
-        readClientSyncTag(packet.getTag());
+    public void onDataPacket(Connection connection, ValueInput input) {
+        readClientSyncTag(input);
     }
     @Override
-    public void loadAdditional(
-            CompoundTag tag,
-            HolderLookup.Provider registries
-    ) {
-        super.loadAdditional(tag, registries);
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
 
-        energyStored = tag.getLong("EnergyStored");
-        currentOutput = tag.getDouble("CurrentOutput");
-        powered = tag.getBoolean("Powered");
-        active = tag.getBoolean("Active");
-
-        energyStage = EnergyStage.fromOrdinal(
-                tag.getInt("EnergyStage")
-        );
+        energyStored = input.getLongOr("EnergyStored", 0L);
+        currentOutput = input.getDoubleOr("CurrentOutput", 0.0D);
+        powered = input.getBooleanOr("Powered", false);
+        active = input.getBooleanOr("Active", false);
+        energyStage = EnergyStage.fromOrdinal(input.getIntOr("EnergyStage", 0));
     }
 
     @Override
-    public void saveAdditional(
-            CompoundTag tag,
-            HolderLookup.Provider registries
-    ) {
-        super.saveAdditional(tag, registries);
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
 
-        tag.putLong("EnergyStored", energyStored);
-        tag.putDouble("CurrentOutput", currentOutput);
-        tag.putBoolean("Powered", powered);
-        tag.putBoolean("Active", active);
-        tag.putInt("EnergyStage", energyStage.ordinal());
+        output.putLong("EnergyStored", energyStored);
+        output.putDouble("CurrentOutput", currentOutput);
+        output.putBoolean("Powered", powered);
+        output.putBoolean("Active", active);
+        output.putInt("EnergyStage", energyStage.ordinal());
     }
 
     public enum EnergyStage {

@@ -7,10 +7,10 @@
     "GPG"
   ],
   "key": {
-    "N": { "item": "minecraft:gold_nugget" },
-    "C": { "item": "minecraft:glass" },
-    "G": { "tag": "c:gears/gold" },
-    "P": { "item": "minecraft:piston" }
+    "N": "minecraft:gold_nugget",
+    "C": "minecraft:glass",
+    "G": "#c:gears/gold",
+    "P": "minecraft:piston"
   },
   "result": {
     "id": "railcraftengines:hobbyist_steam_engine",

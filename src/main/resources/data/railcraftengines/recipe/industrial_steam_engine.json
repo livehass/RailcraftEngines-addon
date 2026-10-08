@@ -7,10 +7,10 @@
     "GPG"
   ],
   "key": {
-    "I": { "tag": "c:plates/steel" },
-    "C": { "item": "minecraft:glass" },
-    "G": { "tag": "c:gears/steel" },
-    "P": { "item": "minecraft:piston" }
+    "I": "#c:plates/steel",
+    "C": "minecraft:glass",
+    "G": "#c:gears/steel",
+    "P": "minecraft:piston"
   },
   "result": {
     "id": "railcraftengines:industrial_steam_engine",
